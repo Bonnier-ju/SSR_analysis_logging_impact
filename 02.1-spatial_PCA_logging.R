@@ -99,13 +99,9 @@ X <- scaleGen(genind_data, NA.method = "mean")
 g_test <- global.rtest(X, spca_plot$lw, nperm = 9999)
 l_test <- local.rtest(X, spca_plot$lw, nperm = 9999)
 
-# Optional: print results to console
 print(g_test)
 print(l_test)
 
-# Optional: export test results to text
-capture.output(list(Global_Test = g_test, Local_Test = l_test),
-               file = file.path(out_dir, paste0("structure_tests_", plot_name, ".txt")))
 
 ### sPCA Scores Plot
 score_df <- data.frame(
@@ -116,20 +112,68 @@ score_df <- data.frame(
 )
 
 score_plot <- ggplot(score_df, aes(x = sPCA1, y = sPCA2)) +
-  geom_point(size = 3, color = "darkblue") +
+  geom_point(size = 3, color = plot_color) +
   labs(title = paste("sPCA Scores -", plot_name),
        x = "sPCA Axis 1", y = "sPCA Axis 2") +
   theme_minimal()
+print(score_plot)
 
 ggsave(file.path(out_dir, paste0("scores_", plot_name, ".png")),
-       plot = score_plot, width = 7, height = 6)
+       plot = score_plot, width = 7, height = 6, bg = "white")
 
-### Interpolated lagged scores (Axis 1)
-png(file.path(out_dir, paste0("interpolation_", plot_name, ".png")), width = 800, height = 700)
+
+########## Visalization of lagged score on topographic map ############
+
+# Load additional required libraries
+library(sf)
+library(akima)    
+library(raster)   
+library(RColorBrewer)
+
+# Read isolines shapefile
+file_path_isolines <- "C:/Users/bonni/Desktop/Fichiers_cartes_Qgis/Isolignes/Isolignes_Regina_5m/SUb_sample_isoligne_regina.shp"
+isolines <- st_read(file_path_isolines)
+# Transform to WGS84 to match coords
+isolines_wgs84 <- st_transform(isolines, crs = 4326)
+# Convert sample coordinates to sf points
+coords_sf <- st_as_sf(data.frame(coords), coords = c("long", "lat"), crs = 4326)
+
+# Get bounding box of study area (coords) and expand a little
+bbox <- st_bbox(coords_sf)
+bbox_exp <- bbox
+bbox_exp[1] <- bbox[1] - 0.001  # xmin
+bbox_exp[2] <- bbox[2] - 0.001  # ymin
+bbox_exp[3] <- bbox[3] + 0.001  # xmax
+bbox_exp[4] <- bbox[4] + 0.001  # ymax
+
+# Crop isolines to bounding box
+isolines_crop <- st_crop(isolines_wgs84, bbox_exp)
+
+# Interpolation of lagged score (1st axis)
 interp_data <- interp(coords$long, coords$lat, spca_plot$ls[, 1], duplicate = "mean")
-image(interp_data, col = azur(100))
-points(coords$long, coords$lat)
-dev.off()
+
+# Convert to data.frame for ggplot
+interp_df <- expand.grid(x = interp_data$x, y = interp_data$y)
+interp_df$z <- as.vector(interp_data$z)
+
+# Create interpolation + isolines map
+lagged_map <- ggplot() +
+  geom_raster(data = interp_df, aes(x = x, y = y, fill = z)) +
+  scale_fill_gradientn(colors = azur(50), name = "Lagged\nScore 1") +
+  geom_sf(data = isolines_crop, color = "grey30", size = 0.3, alpha = 0.8) +
+  geom_point(data = coords, aes(x = long, y = lat), color = ifelse(is.null(plot_color), "black", "black"), size = 2) +
+  coord_sf(xlim = c(bbox_exp["xmin"], bbox_exp["xmax"]),
+           ylim = c(bbox_exp["ymin"], bbox_exp["ymax"]),
+           expand = FALSE) +
+  labs(title = paste("Lagged Score 1 with Isolines -", plot_name),
+       x = "Longitude", y = "Latitude") +
+  theme_minimal()
+
+
+print(lagged_map)
+ggsave(file.path(out_dir, paste0("lagged_isolines_", plot_name, ".png")),
+       plot = lagged_map, width = 10, height = 7, dpi = 300, bg = "white")
+
 
 ### Allele contributions (Axis 1)
 allele_contrib <- spca_plot$c1[, 1]^2
