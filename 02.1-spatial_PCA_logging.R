@@ -46,7 +46,7 @@ coords_PAI <- PAI[, c("lat", "long")]
 coords_all <- data_all[, c("lat", "long")]
 
 # sPCA on each dataset
-# type = 6, number of neighour = 30
+# type = 6, number of neighbours = 30
 spca_HKO <- spca(genind_HKO, xy = coords_HKO, ask = FALSE, type = 6, scannf = FALSE)
 spca_PAI <- spca(genind_PAI, xy = coords_PAI, ask = FALSE, type = 6, scannf = FALSE)
 spca_all <- spca(genind_all, xy = coords_all, ask = FALSE, type = 6, scannf = FALSE)
@@ -56,7 +56,7 @@ spca_all <- spca(genind_all, xy = coords_all, ask = FALSE, type = 6, scannf = FA
 
 # Choose which plot to analyze
 # Options: "HKO50", "PAI74", "ALL"
-plot_name <- "HKO50"  # Change this line to switch dataset
+plot_name <- "ALL"  # Change this line to switch dataset
 
 if (plot_name == "HKO50") {
   spca_plot <- spca_HKO
@@ -131,7 +131,7 @@ library(raster)
 library(RColorBrewer)
 
 # Read isolines shapefile
-file_path_isolines <- "C:/Users/bonni/Desktop/Fichiers_cartes_Qgis/Isolignes/Isolignes_Regina_5m/SUb_sample_isoligne_regina.shp"
+file_path_isolines <- "C:/Users/bonni/Desktop/Fichiers_cartes_Qgis/Isolignes/Isolignes_Regina_5m/fr_662043116_lidar_regstgmult2013_02.shp"
 isolines <- st_read(file_path_isolines)
 # Transform to WGS84 to match coords
 isolines_wgs84 <- st_transform(isolines, crs = 4326)
@@ -159,7 +159,7 @@ interp_df$z <- as.vector(interp_data$z)
 # Create interpolation + isolines map
 lagged_map <- ggplot() +
   geom_raster(data = interp_df, aes(x = x, y = y, fill = z)) +
-  scale_fill_gradientn(colors = azur(50), name = "Lagged\nScore 1") +
+  scale_fill_gradientn(colors = c("mediumorchid4", "white", "#CDAD00"), name = "Lagged\nScore 1") +
   geom_sf(data = isolines_crop, color = "grey30", size = 0.3, alpha = 0.8) +
   geom_point(data = coords, aes(x = long, y = lat), color = ifelse(is.null(plot_color), "black", "black"), size = 2) +
   coord_sf(xlim = c(bbox_exp["xmin"], bbox_exp["xmax"]),
