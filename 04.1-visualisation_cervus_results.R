@@ -8,11 +8,13 @@ library(tidyr)
 library(geosphere)
 library(readr)
 
-
 # Load CERVUS result file
-results <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.1-parentage_cervus/HKO50/results/summary_cervus_HKO50.csv", sep = ";")
-geo_data <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Data/metadata_HKO50.csv", sep = ";")
+results <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Analysis/05-Parentage_analysis/05.2-parentage_with_cervus/5.2.2 Analyses V2/Regina/summary_Regina.csv", sep = ";")
+geo_data <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Data_initial/Original_files_with_contamination/Regina/geo_inds_REG.csv", sep = ";")
 
+# === Define plot name and color ===
+plot_name <- "PAI74"
+plot_color <- "mediumorchid4"
 
 # Merge coordinates with offspring and candidate parents
 results_geo <- results %>%
@@ -43,7 +45,7 @@ links_second <- results_geo %>%
          confidence = Pair.confidence.1)
 
 links <- bind_rows(links_first, links_second)
-
+head(links)
 
 # Plot results
 ggplot() +
@@ -63,7 +65,133 @@ ggplot() +
   scale_shape_manual(values = c("Offspring" = 16, "Parent" = 17)) +
   
   theme_minimal() +
-  labs(title = "Parent-offspring links – HKO50",
+  labs(title = paste("Parent-Offspring Links –", plot_name),
        x = "Longitude", y = "Latitude", color = "Type", shape = "Type")
 
-# Plot results with topographic line 
+
+
+
+#### Plot results with topographic line ####
+# Load isolines and transform CRS
+file_path_isolines <- "C:/Users/bonni/Desktop/Fichiers_cartes_Qgis/Isolignes/Isolignes_Regina_5m/fr_662043116_lidar_regstgmult2013_02.shp"
+isolines <- st_read(file_path_isolines, quiet = TRUE)
+isolines_wgs84 <- st_transform(isolines, crs = 4326)
+
+# Create sf points from parent-offspring coordinates
+coords_all <- data.frame(
+  ID = c(links$Offspring.ID, links$parent_id),
+  long = c(links$long_offspring, links$long_parent),
+  lat = c(links$lat_offspring, links$lat_parent)
+)
+coords_sf <- st_as_sf(coords_all, coords = c("long", "lat"), crs = 4326)
+
+# Compute bounding box and expand
+bbox <- st_bbox(coords_sf)
+bbox_exp <- structure(
+  c(
+    xmin = bbox["xmin"] - 0.001,
+    ymin = bbox["ymin"] - 0.001,
+    xmax = bbox["xmax"] + 0.001,
+    ymax = bbox["ymax"] + 0.001
+  ),
+  class = "bbox",
+  crs = st_crs(isolines_wgs84)
+)
+
+# Crop isolines
+isolines_crop <- st_crop(isolines_wgs84, bbox_exp)
+
+# Create plot object
+parentage_plot <- ggplot() +
+  geom_sf(data = isolines_crop, color = "grey50", size = 0.3, alpha = 0.7) +
+  geom_segment(data = links, aes(x = long_offspring, y = lat_offspring,
+                                 xend = long_parent, yend = lat_parent),
+               color = "darkorange", size = 0.7, alpha = 0.8) +
+  geom_point(data = links, aes(x = long_offspring, y = lat_offspring, shape = "Offspring"),
+             color = "forestgreen", size = 3) +
+  geom_point(data = links, aes(x = long_parent, y = lat_parent, shape = "Parent"),
+             color = "royalblue", size = 3) +
+  scale_shape_manual(values = c("Offspring" = 16, "Parent" = 17), name = "Individuals") +
+  theme_minimal() +
+  theme(
+    legend.position = c(0.99, 0.9),  # Top right inside the plot
+    legend.justification = c("right", "top"),
+    legend.background = element_rect(fill = "white", color = "black"),
+    legend.key = element_rect(fill = "white")
+  ) +
+  labs(
+    title = paste("Parent-Offspring Links –", plot_name),
+    x = "Longitude", y = "Latitude"
+  ) +
+  coord_sf(
+    xlim = c(bbox_exp["xmin"], bbox_exp["xmax"]),
+    ylim = c(bbox_exp["ymin"], bbox_exp["ymax"]),
+    expand = FALSE
+  )
+
+# Display the plot
+print(parentage_plot)
+
+# Save as PNG
+ggsave(
+  filename = paste0("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.1-parentage_cervus/Results_graphs/parent_offspring_map_", plot_name, ".png"),
+  plot = parentage_plot,
+  width = 10,
+  height = 8,
+  dpi = 300,
+  bg = "white"
+)
+
+#### Analysis on distances parents_offspring
+
+# Compute Haversine distance in meters between each offspring and its assigned parent
+links <- links %>%
+  mutate(
+    distance = distHaversine(
+      cbind(long_offspring, lat_offspring),
+      cbind(long_parent, lat_parent)
+    )
+  )
+
+# Summary statistics of parent-offspring distances
+distance_stats <- links %>%
+  summarise(
+    mean_distance = mean(distance, na.rm = TRUE),
+    min_distance = min(distance, na.rm = TRUE),
+    max_distance = max(distance, na.rm = TRUE)
+  )
+
+# Print the results
+print(distance_stats)
+
+# Count total number of links
+total_links <- nrow(links)
+cat("Total number of parent-offspring links:", total_links, "\n")
+
+
+# histogram of parents-offspring distances
+hist_distance <- ggplot(links, aes(x = distance)) +
+  geom_histogram(binwidth = 10, fill = plot_color, color = "white", alpha = 0.8) +
+  geom_vline(aes(xintercept = mean(distance, na.rm = TRUE)),
+             linetype = "dashed", color = "black", linewidth = 0.8) +
+  labs(
+    title = paste("Histogram of Parent-Offspring Distances –", plot_name),
+    x = "Distance (meters)",
+    y = "Number of Pairs"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  )
+print(hist_distance)
+
+ggsave(
+  filename = paste0("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.1-parentage_cervus/Results_graphs/histogram_distances_", plot_name, ".png"),
+  plot = hist_distance,
+  width = 8,
+  height = 6,
+  dpi = 300,
+  bg = "white"
+)
