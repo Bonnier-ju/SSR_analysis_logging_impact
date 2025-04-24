@@ -8,11 +8,11 @@ library(ineq)
 
 # === SETUP ===
 plots <- list(
-  list(code = "HKO50", fullname = "HKO50 (unlogged)"),
-  list(code = "PAI74", fullname = "PAI74 (logged)"),
+  list(code = "HKO50", fullname = "HKO50"),
+  list(code = "PAI74", fullname = "PAI74"),
   list(code = "PAR", fullname = "Paracou"),
   list(code = "SPR", fullname = "Sparouine"),
-  list(code = "NOU", fullname = "Nouragues (unlogged)")
+  list(code = "NOU", fullname = "Nouragues")
 )
 
 plot_colors <- list(
@@ -23,7 +23,7 @@ plot_colors <- list(
   "HKO50"     = "#CDAD00"
 )
 
-input_dir <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Analysis/05-Parentage_analysis/05.6-parentage_with_haplotype"
+input_dir <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo"
 output_dir <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/07-post_analysis_on_dispersal/07.1-gini_index_and_lorenz_curve"
 
 
@@ -32,7 +32,7 @@ all_data <- list()
 
 for (p in plots) {
   file_path <- file.path(input_dir, paste0("comparison_data_", p$code, ".csv"))
-  df <- read.csv(file_path, sep = ";")
+  df <- read.csv(file_path, sep = ",")
   all_data[[p$code]] <- df
 }
 
@@ -51,7 +51,7 @@ compute_gini_info <- function(data, plot_code) {
   
   # Bootstrap IC
   set.seed(123)
-  gini_boot <- replicate(1000, Gini(sample(parent_counts, replace = TRUE)))
+  gini_boot <- replicate(10000, Gini(sample(parent_counts, replace = TRUE)))
   ci <- quantile(gini_boot, c(0.025, 0.975))
   
   return(list(
@@ -96,7 +96,7 @@ pairwise_results <- pairwise_results %>%
       group_labels <- c(rep(1, length(g1$counts)), rep(2, length(g2$counts)))
       obs_diff <- abs(g1$gini - g2$gini)
       
-      perm_diffs <- replicate(1000, {
+      perm_diffs <- replicate(10000, {
         shuffled <- sample(group_labels)
         G1 <- Gini(combined[shuffled == 1])
         G2 <- Gini(combined[shuffled == 2])
