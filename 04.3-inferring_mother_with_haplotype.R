@@ -11,16 +11,16 @@ library(utils)
 library(geosphere)
 
 # Load and prepare Cervus data
-file_path_cervus <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Analysis/05-Parentage_analysis/05.2-parentage_with_cervus/5.2.2 Analyses V2/Regina/summary_Regina.csv"
-data_cervus <- read_csv2(file_path_cervus)  # Assuming ';' as delimiter
+file_path_cervus <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.1-parentage_cervus/PAI74/summary_PAI74.csv"
+data_cervus <- read_csv(file_path_cervus)  # Assuming ';' as delimiter
 data_cervus <- data_cervus %>%
-  filter(grepl("/\+|\\*", Pair_confidence1) | grepl("\\+|\\*", Pair_confidence2)) %>%
+  filter(grepl("\\+|\\*", Pair_confidence1) | grepl("\\+|\\*", Pair_confidence2)) %>%
   rename(OffspringID = Offspring_ID) %>%  # Rename to match Colony data
   select(OffspringID, Parent1_Cervus = First_candidate_ID, Parent2_Cervus = Second_candidate_ID)
 
 # Load and prepare Colony data
-file_path_colony <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Analysis/05-Parentage_analysis/05.4-parentage_with_colony/Regina/Results_Regina/Regina_Colony.BestConfig.csv"
-data_colony <- read_csv2(file_path_colony) %>%
+file_path_colony <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.2-parentage_Colony/PAI74/results_colony_PAI74/PAI74_colony_projet.BestConfig.csv"
+data_colony <- read_csv(file_path_colony) %>%
   filter(!(str_starts(FatherID, "#") & str_starts(MotherID, "#"))) %>%  # Exclude only if both parents are supposed
   select(OffspringID, Parent1_Colony = FatherID, Parent2_Colony = MotherID)
 
@@ -46,11 +46,11 @@ print(comparison_data)
 
 
 # Load haplotype data
-file_path_haplotypes <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Data_initial/Chloroplastic_markers/Haplotype.csv"
+file_path_haplotypes <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Data/Chloroplatics_markers/Haplotype_full.csv"
 
 # Load haplotype data using read.table
 data_haplotypes <- read.table(file_path_haplotypes, 
-                              sep = ";",               # Set semicolon as the field separator
+                              sep = ",",               # Set semicolon as the field separator
                               dec = ".",               # Set period as the decimal mark
                               header = TRUE,           # Assumes the first line in your file has column headers
                               stringsAsFactors = FALSE, # Ensures text data isn't converted to factors
@@ -59,7 +59,7 @@ data_haplotypes <- read.table(file_path_haplotypes,
                                              lat="numeric",
                                              long="numeric",
                                              dbh="numeric",
-                                             class="character",
+                                             alt="numeric",
                                              Haplotypes="character") # Explicitly define column classes
 )
 
@@ -90,7 +90,6 @@ comparison_data <- comparison_data %>%
     Latitude_Offspring = lat.x,
     Longitude_Offspring = long.x,
     DBH_Offspring = dbh.x,
-    Class_Offspring = class.x,
     Haplotypes_Offspring = Haplotypes,
     
     # Parent 1 Information
@@ -99,7 +98,6 @@ comparison_data <- comparison_data %>%
     Latitude_Parent1 = lat.y,
     Longitude_Parent1 = long.y,
     DBH_Parent1 = dbh.y,
-    Class_Parent1 = class.y,
     Haplotypes_Parent1,
     
     # Parent 2 Information
@@ -108,7 +106,6 @@ comparison_data <- comparison_data %>%
     Latitude_Parent2 = lat,
     Longitude_Parent2 = long,
     DBH_Parent2 = dbh,
-    Class_Parent2 = class,
     Haplotypes_Parent2,
     
     # Haplotype Matching Results
@@ -121,7 +118,7 @@ comparison_data <- comparison_data %>%
 print(comparison_data)
 
 #Save csv file
-output_file_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Analysis/05-Parentage_analysis/05.6-parentage_with_haplotype/comparison_data_REG.csv"
+output_file_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo/comparison_data_PAI74.csv"
 write.csv(comparison_data, file = output_file_path, row.names = FALSE)
 
 
@@ -179,7 +176,7 @@ print(paste("Mean Distance to Mothers:", round(mean_distance_mother, 2), "meters
 print(paste("Mean Distance to Fathers:", round(mean_distance_father, 2), "meters"))
 
 # Define the file path for saving filtered data
-output_filtered_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Analysis/05-Parentage_analysis/05.6-parentage_with_haplotype/filtered_data_REG.csv"
+output_filtered_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo/filtered_data_HKO50.csv"
 write.csv(filtered_data, file = output_filtered_path, row.names = FALSE)
 
 
@@ -243,7 +240,7 @@ library(sf)
 library(ggrepel)
 
 # Load the isoline shapefile
-file_path_isolines <- "C:/Users/bonni/Desktop/Fichiers_cartes_Qgis/Isolignes/Isolignes_Regina_5m/SUb_sample_isoligne_regina.shp"
+file_path_isolines <- "C:/Users/bonni/Desktop/Fichiers_cartes_Qgis/Isolignes/Isolignes_Regina_5m/fr_662043116_lidar_regstgmult2013_02.shp"
 isolines <- st_read(file_path_isolines)
 
 # Transform the isolines to WGS84 (EPSG:4326) to match the offspring-parent data
@@ -300,11 +297,11 @@ ggplot() +
   
   # Position the legend inside the plot
   theme_minimal() +
-  theme(legend.position = c(0.85, 0.15),  # Bottom right inside the plot
+  theme(legend.position = c(0.85, 0.85),  # Bottom right inside the plot
         legend.background = element_rect(fill = "white", color = "black", size = 0.5),
         legend.key = element_rect(fill = "white")) +
   
-  labs(title = "Seed and Pollen dispersal in Regina",
+  labs(title = "Seed and Pollen dispersal in HKO50",
        x = "Longitude", y = "Latitude") +
   
   # Set zoom limits
@@ -313,6 +310,48 @@ ggplot() +
     ylim = c(ymin, ymax),
     expand = FALSE
   )
+
+
+# === Filter only Mother-Offspring links ===
+mother_links <- map_data %>%
+  filter(Link_Type == "Mother-Offspring")
+
+# Create the map with only mother-offspring connections
+ggplot() +
+  # Add isolines
+  geom_sf(data = isolines_wgs84, color = "gray50", size = 0.3, alpha = 0.7) +
+  
+  # Plot mother-offspring connections
+  geom_segment(data = mother_links, aes(x = Longitude_Offspring, y = Latitude_Offspring, 
+                                        xend = Longitude, yend = Latitude),
+               color = "red", size = 1, alpha = 0.7) +
+  
+  # Plot offspring points
+  geom_point(data = filtered_data, aes(x = Longitude_Offspring, y = Latitude_Offspring, shape = "Offspring"), 
+             color = "green", size = 3, alpha = 0.8) +
+  
+  # Plot mother points
+  geom_point(data = filtered_data, aes(x = Longitude_Mother, y = Latitude_Mother, shape = "Parent"), 
+             color = "blue", size = 3, alpha = 0.8) +
+  
+  # Customize legend
+  scale_shape_manual(values = c("Offspring" = 16, "Parent" = 17), name = "Individuals") +
+  
+  theme_minimal() +
+  theme(legend.position = c(0.85, 0.85),
+        legend.background = element_rect(fill = "white", color = "black", size = 0.5),
+        legend.key = element_rect(fill = "white")) +
+  
+  labs(title = "Seed Dispersal (Mother-Offspring Links Only) – PAI74",
+       x = "Longitude", y = "Latitude") +
+  
+  # Zoom on the study area
+  coord_sf(
+    xlim = c(xmin, xmax),
+    ylim = c(ymin, ymax),
+    expand = FALSE
+  )
+
 
 
 ###################### New visualisation of the results #######################
@@ -324,7 +363,7 @@ library(readr)
 
 
 # Loading files
-filtered_data <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Analysis/05-Parentage_analysis/05.6-parentage_with_haplotype/filtered_data_REG.csv", sep=";")  
+filtered_data <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo/filtered_data_HKO50.csv")  
 
 
 ########################### Pollen dispersal bar chart #########################
@@ -340,11 +379,11 @@ pollen_summary <- filtered_data %>%
 
 # plot 800x500
 ggplot(pollen_summary, aes(x = Pollen_Distance_Bin, y = Events)) +
-  geom_bar(stat = "identity", fill = "mediumorchid4", color = "black") +
+  geom_bar(stat = "identity", fill = "#CDAD00", color = "black") +
   scale_x_continuous(breaks = seq(0, 500, by = 50), limits = c(0, 500)) +
   scale_y_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
   theme_minimal() +
-  labs(title = "Pollen Dispersal Distance Distribution - Regina",
+  labs(title = "Pollen Dispersal Distance Distribution - HKO50",
        x = "Pollen Dispersal Distance (m)",
        y = "Number of Events") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -364,7 +403,7 @@ seed_summary <- filtered_data %>%
 
 # Plot the histogram : 800x500
 ggplot(seed_summary, aes(x = Seed_Distance_Bin, y = Events)) +
-  geom_bar(stat = "identity", fill = "mediumorchid4", color = "black") +
+  geom_bar(stat = "identity", fill = "#CDAD00", color = "black") +
   scale_x_continuous(breaks = seq(0, 440, by = 20), limits = c(0, 440)) +
   scale_y_continuous(breaks = seq(0, 20, by = 2), limits = c(0, 20)) +
   theme_minimal() +
