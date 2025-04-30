@@ -176,7 +176,7 @@ print(paste("Mean Distance to Mothers:", round(mean_distance_mother, 2), "meters
 print(paste("Mean Distance to Fathers:", round(mean_distance_father, 2), "meters"))
 
 # Define the file path for saving filtered data
-output_filtered_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo/filtered_data_HKO50.csv"
+output_filtered_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo/filtered_data_PAI74.csv"
 write.csv(filtered_data, file = output_filtered_path, row.names = FALSE)
 
 
@@ -363,7 +363,7 @@ library(readr)
 
 
 # Loading files
-filtered_data <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo/filtered_data_HKO50.csv")  
+filtered_data <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo/filtered_data_PAI74.csv")  
 
 
 ########################### Pollen dispersal bar chart #########################
@@ -379,11 +379,11 @@ pollen_summary <- filtered_data %>%
 
 # plot 800x500
 ggplot(pollen_summary, aes(x = Pollen_Distance_Bin, y = Events)) +
-  geom_bar(stat = "identity", fill = "#CDAD00", color = "black") +
+  geom_bar(stat = "identity", fill = "mediumorchid4", color = "black") +
   scale_x_continuous(breaks = seq(0, 500, by = 50), limits = c(0, 500)) +
   scale_y_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
   theme_minimal() +
-  labs(title = "Pollen Dispersal Distance Distribution - HKO50",
+  labs(title = "Pollen Dispersal Distance Distribution - PAI74",
        x = "Pollen Dispersal Distance (m)",
        y = "Number of Events") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -403,11 +403,11 @@ seed_summary <- filtered_data %>%
 
 # Plot the histogram : 800x500
 ggplot(seed_summary, aes(x = Seed_Distance_Bin, y = Events)) +
-  geom_bar(stat = "identity", fill = "#CDAD00", color = "black") +
+  geom_bar(stat = "identity", fill = "mediumorchid4", color = "black") +
   scale_x_continuous(breaks = seq(0, 440, by = 20), limits = c(0, 440)) +
   scale_y_continuous(breaks = seq(0, 20, by = 2), limits = c(0, 20)) +
   theme_minimal() +
-  labs(title = "Seed Dispersal Distance Distribution - Regina",
+  labs(title = "Seed Dispersal Distance Distribution - PAI74",
        x = "Seed Dispersal Distance (m)",
        y = "Number of Events") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))

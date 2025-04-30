@@ -9,10 +9,10 @@ library(dplyr)
 ### Files parameters ###
 site_id <- "PAI74"         
 site_title <- "PAI74"   
-suffix <- "BIG"         
+suffix <- "FULL_logged"         
 line_color <- "mediumorchid4"
 
-base_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/03-diversity_and_SGS_analysis"
+base_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/03-diversity_and_SGS_analysis/spagedie/input_for_Fij_graphs"
 
 
 input_file <- file.path(base_path, paste0("Fij_", site_id, "_", suffix, ".csv"))
@@ -22,7 +22,7 @@ output_file <- file.path(base_path, paste0("Fij_", site_id, "_", suffix, ".png")
 #output_file <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/03-diversity_and_SGS_analysis/PAI74_fij_graphs.png"
 
 ### Import data ###
-df <- read.csv(input_file, sep = ";", header = FALSE)
+df <- read.csv(input_file, sep = ",", header = FALSE)
 
 b_log <- round(as.numeric(df[6, 14]), 4)
 distance_classes <- c("0", "30", "60", "90", "130", "170", "220", "300", "600")
@@ -62,13 +62,13 @@ plot <- ggplot() +
     breaks = kinship_df$x_plot,
     labels = kinship_df$distance_class
   ) +
-  coord_cartesian(ylim = c(-0.08, 0.08)) +
+  coord_cartesian(ylim = c(-0.09, 0.09)) +
   geom_text(
     aes(x = Inf, y = Inf, label = paste0("b-log = ", b_log)),
     hjust = 1.5, vjust = 3, size = 4
   ) +
   labs(
-    title = "PAI74 - BIG",
+    title = paste(site_title, suffix, sep = " - "), 
     x = "Distance class (m)",
     y = "Kinship coefficient"
   ) +
@@ -92,3 +92,4 @@ ggsave(
   dpi = 300,
   bg = "white"
 )
+

@@ -9,8 +9,8 @@ library(geosphere)
 library(readr)
 
 # Load CERVUS result file
-results <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Analysis/05-Parentage_analysis/05.2-parentage_with_cervus/5.2.2 Analyses V2/Regina/summary_Regina.csv", sep = ";")
-geo_data <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - SSR Populations/Data_initial/Original_files_with_contamination/Regina/geo_inds_REG.csv", sep = ";")
+results <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.1-parentage_cervus/PAI74/summary_PAI74.csv", sep = ",")
+geo_data <- read.csv("C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Data/PAI74/coord_PAI74.csv", sep = ",")
 
 # === Define plot name and color ===
 plot_name <- "PAI74"
@@ -18,31 +18,31 @@ plot_color <- "mediumorchid4"
 
 # Merge coordinates with offspring and candidate parents
 results_geo <- results %>%
-  left_join(geo_data, by = c("Offspring.ID" = "ID")) %>%
+  left_join(geo_data, by = c("Offspring_ID" = "ID")) %>%
   rename(lat_offspring = lat, long_offspring = long) %>%
-  left_join(geo_data, by = c("First.candidate.ID" = "ID")) %>%
+  left_join(geo_data, by = c("First_candidate_ID" = "ID")) %>%
   rename(lat_first_parent = lat, long_first_parent = long) %>%
-  left_join(geo_data, by = c("Second.candidate.ID" = "ID")) %>%
+  left_join(geo_data, by = c("Second_candidate_ID" = "ID")) %>%
   rename(lat_second_parent = lat, long_second_parent = long)
 
 # Extract high-confidence pair links
 links_first <- results_geo %>%
-  filter(Pair.confidence %in% c("*", "+")) %>%
-  select(Offspring.ID, lat_offspring, long_offspring,
-         First.candidate.ID, lat_first_parent, long_first_parent, Pair.confidence) %>%
-  rename(parent_id = First.candidate.ID,
+  filter(Pair_confidence1 %in% c("*", "+")) %>%
+  select(Offspring_ID, lat_offspring, long_offspring,
+         First_candidate_ID, lat_first_parent, long_first_parent, Pair_confidence1) %>%
+  rename(parent_id = First_candidate_ID,
          lat_parent = lat_first_parent,
          long_parent = long_first_parent,
-         confidence = Pair.confidence)
+         confidence = Pair_confidence1)
 
 links_second <- results_geo %>%
-  filter(Pair.confidence.1 %in% c("*", "+")) %>%
-  select(Offspring.ID, lat_offspring, long_offspring,
-         Second.candidate.ID, lat_second_parent, long_second_parent, Pair.confidence.1) %>%
-  rename(parent_id = Second.candidate.ID,
+  filter(Pair_confidence2 %in% c("*", "+")) %>%
+  select(Offspring_ID, lat_offspring, long_offspring,
+         Second_candidate_ID, lat_second_parent, long_second_parent, Pair_confidence2) %>%
+  rename(parent_id = Second_candidate_ID,
          lat_parent = lat_second_parent,
          long_parent = long_second_parent,
-         confidence = Pair.confidence.1)
+         confidence = Pair_confidence2)
 
 links <- bind_rows(links_first, links_second)
 head(links)

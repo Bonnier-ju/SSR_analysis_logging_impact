@@ -8,33 +8,33 @@ library(dplyr)
 library(stringr)
 
 # Charger les fichiers
-file_path_1 <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.2-parentage_Colony/HKO50/results_colony_HKO50/HKO50_colony.BestConfig.csv"
-file_path_2 <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Data/HKO50_tree_info.csv"
+file_path_1 <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.2-parentage_Colony/PAI74/results_colony_PAI74/PAI74_colony_projet.BestConfig.csv"
+file_path_2 <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Data/PAI74/PAI74_tree_info.csv"
 
 
 # Lire les fichiers CSV
 best_config <- read.csv(file_path_1, header = TRUE, stringsAsFactors = FALSE, sep = ",")
 tree_info <- read.csv(file_path_2, header = TRUE, stringsAsFactors = FALSE)
 
-# Fusionner les donn?es pour descendants (OffspringID)
+# Merges data (OffspringID)
 offspring_positions <- best_config %>%
   left_join(tree_info, by = c("OffspringID" = "ID"))
 
 tree_info <- tree_info %>% distinct(ID, .keep_all = TRUE)
 
 
-# Fusionner les donn?es pour p?res (FatherID)
+# Merge father ID 
 father_positions <- best_config %>%
   left_join(tree_info, by = c("FatherID" = "ID")) %>%
   rename(FatherLat = lat, FatherLong = long)
 
-# Fusionner les donn?es pour m?res (MotherID)
+# Merge MotherID
 mother_positions <- best_config %>%
   left_join(tree_info, by = c("MotherID" = "ID")) %>%
   rename(MotherLat = lat, MotherLong = long)
 
 
-# Combiner les donn?es dans un seul tableau
+# Merge in one table
 map_data <- offspring_positions %>%
   select(OffspringID, lat, long, FatherID, MotherID) %>% # Ajouter FatherID et MotherID
   rename(OffspringLat = lat, OffspringLong = long) %>%
@@ -63,7 +63,7 @@ cat("✅ Nombre d'offspring avec les DEUX parents identifiés :", n_with_both_re
 
 
 
-# Cr?er une carte avec ggplot2
+# Ploting results on a map 
 # 700x700
 ggplot() +
   # Ajouter les liens p?re-descendant (gris, moins transparent)
@@ -92,7 +92,7 @@ ggplot() +
   # Personnalisation
   scale_fill_manual(values = c("Offspring" = "green", "Parent" = "blue"),
                     name = "Type") +
-  labs(title = "Regina",
+  labs(title = "PAI74",
        x = "Longitude", y = "Latitude") +
   theme_minimal() +
   theme(legend.position = "right")
@@ -109,11 +109,11 @@ ggplot() +
 library(ggplot2)
 library(dplyr)
 
-file_path_1 <- "C:/Users/bonni/OneDrive/Universit?/Th?se/Dicorynia/Article - SSR Populations/Analysis/05-Parentage_analysis/05.4-parentage_with_colony/Regina/Results_Regina/Regina_colony.BestCluster.csv"
+file_path_1 <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.2-parentage_Colony/PAI74/results_colony_PAI74/PAI74_colony_projet.BestCluster.csv"
 best_cluster <- read.csv(file_path_1, header = TRUE, stringsAsFactors = FALSE)
 head(best_cluster)
 
-file_path_2 <- "C:/Users/bonni/OneDrive/Universit?/Th?se/Dicorynia/Article - SSR Populations/Data_initial/Regina/Regina_tree_info.csv"
+file_path_2 <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Data/PAI74/PAI74_tree_info.csv"
 tree_info <- read.csv(file_path_2, header = TRUE, stringsAsFactors = FALSE)
 
 # Remplacer les "#" par NA dans FatherID et MotherID
@@ -181,7 +181,7 @@ ggplot() +
   # Personnalisation des couleurs et axes
   scale_fill_manual(values = scales::hue_pal()(length(unique(cluster_data$ClusterIndex)))) +
   scale_color_manual(values = scales::hue_pal()(length(unique(cluster_data$ClusterIndex)))) +
-  labs(title = "Clusters of relations Parent-Offspring (Regina)",
+  labs(title = "Clusters of relations Parent-Offspring (PAI74)",
        x = "Longitude", y = "Latitude", fill = "Cluster") +  # L?gende uniquement pour les points
   theme_minimal() +
   theme(legend.position = "right")
