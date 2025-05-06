@@ -94,6 +94,15 @@ ggplot() +
   )
 
 
+# Export a CSV of seedling IDs and their canopy status
+output_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Data/PAI74/PAI74_seedlings_canopy_status.csv"
+
+seedlings_export <- seedlings %>%
+  st_drop_geometry() %>%
+  select(ID, dbh, in_gap, in_road, in_landing, in_any_opening)
+
+write.csv(seedlings_export, output_path, row.names = FALSE)
+
 
 ##################### Link canopy opening and seed distances ###################
 library(dplyr)
@@ -140,6 +149,5 @@ ggplot(offspring_sf, aes(x = in_any_opening, y = Distance_To_Mother, fill = in_a
     axis.title = element_text(size = 13)
   )
 
-########### Comparing genetic diversity inside and outside canopy opening #############
 
 
