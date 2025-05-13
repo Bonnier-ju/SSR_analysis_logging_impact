@@ -3,80 +3,115 @@
 ################################################################################
 
 library(dplyr)
-library(ggplot2)
+library(readr)
+library(purrr)
 
 # Define file paths
 file_pai <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/Results/PAI74/results_PAI74_full_bootstrap.csv"
 file_hko <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/Results/HKO50/results_HKO50_full_bootstrap.csv"
 
-# Read the input files
-pai <- read.csv(file_pai)
-hko <- read.csv(file_hko)
+# Load CSV files
+pai <- read_csv(file_pai, show_col_types = FALSE)
+hko <- read_csv(file_hko, show_col_types = FALSE)
 
-# Add a column identifying the plot
+# Add plot column
 pai$Plot <- "PAI74"
 hko$Plot <- "HKO50"
 
-# Combine the two datasets
+# Combine all data
 data_all <- bind_rows(pai, hko)
 
-# Check available column names
-print(colnames(data_all))
-
-# List of genetic diversity indicators to compare
+# Define variables to test
 indicators <- c("AR", "He", "Ho", "Fi")
-
-# Create a list to store the bootstrap results
-bootstrap_results <- list()
-
-# Number of bootstrap iterations
+plots <- unique(data_all$Plot)
+categories <- unique(data_all$Category)
 n_iter <- 10000
-set.seed(123)  # Ensure reproducibility
+set.seed(123)
 
-# Loop through each indicator
-for (ind in indicators) {
-  
-  # Merge the two plots by marker for the current indicator
+# Bootstrap function
+bootstrap_diff <- function(df1, df2, var) {
   merged <- inner_join(
-    hko %>% select(Marker, !!sym(ind)) %>% rename(HKO50 = !!sym(ind)),
-    pai %>% select(Marker, !!sym(ind)) %>% rename(PAI74 = !!sym(ind)),
-    by = "Marker"
-  )
+    df1 %>% select(Markers, value1 = !!sym(var)),
+    df2 %>% select(Markers, value2 = !!sym(var)),
+    by = "Markers"
+  ) %>%
+    mutate(Diff = value2 - value1) %>%
+    filter(!is.na(Diff))
   
-  # Check that we have enough shared markers
   if (nrow(merged) < 5) {
-    warning(paste("Not enough shared markers for", ind))
-    next
+    return(data.frame(
+      Obs_Diff = NA, CI_lower = NA, CI_upper = NA, Significant = NA
+    ))
   }
   
-  # Compute the difference (PAI74 - HKO50) per marker
-  merged <- merged %>%
-    mutate(Diff = PAI74 - HKO50)
-  
-  # Perform bootstrap resampling: resample the marker differences with replacement
   diffs_boot <- replicate(n_iter, {
-    sample(merged$Diff, size = nrow(merged), replace = TRUE) %>% mean()
+    mean(sample(merged$Diff, replace = TRUE))
   })
   
-  # Compute 95% confidence interval of the bootstrap distribution
-  ci <- quantile(diffs_boot, probs = c(0.025, 0.975))
+  ci <- quantile(diffs_boot, c(0.025, 0.975), na.rm = TRUE)
   obs_diff <- mean(merged$Diff)
   
-  # Store the result for this indicator
-  bootstrap_results[[ind]] <- data.frame(
-    Indicator = ind,
+  data.frame(
     Obs_Diff = obs_diff,
     CI_lower = ci[1],
     CI_upper = ci[2],
-    Significant = !(0 >= ci[1] & 0 <= ci[2])  # TRUE if 0 is not in the CI
+    Significant = !(0 >= ci[1] & 0 <= ci[2])
   )
 }
 
-# Combine all indicator results into a final summary table
-final_results <- bind_rows(bootstrap_results)
+# Store results
+all_results <- list()
 
-# Print the results
+# 1. Inter-plot comparisons: same category between PAI74 and HKO50
+for (cat in categories) {
+  for (var in indicators) {
+    group1 <- data_all %>% filter(Plot == "HKO50", Category == cat)
+    group2 <- data_all %>% filter(Plot == "PAI74", Category == cat)
+    
+    result <- bootstrap_diff(group1, group2, var)
+    result$Comparison <- paste0("PAI74 vs HKO50")
+    result$Category <- cat
+    result$Variable <- var
+    result$Type <- "Inter-plot"
+    
+    all_results[[length(all_results) + 1]] <- result
+  }
+}
+
+# 2. Intra-plot comparisons: different categories within each plot
+for (plot in plots) {
+  sub_data <- data_all %>% filter(Plot == plot)
+  combs <- combn(unique(sub_data$Category), 2, simplify = FALSE)
+  
+  for (comb in combs) {
+    cat1 <- comb[1]
+    cat2 <- comb[2]
+    
+    for (var in indicators) {
+      group1 <- sub_data %>% filter(Category == cat1)
+      group2 <- sub_data %>% filter(Category == cat2)
+      
+      result <- bootstrap_diff(group1, group2, var)
+      result$Comparison <- paste0(plot, ": ", cat2, " vs ", cat1)
+      result$Category <- paste(cat1, "vs", cat2)
+      result$Variable <- var
+      result$Type <- "Intra-plot"
+      
+      all_results[[length(all_results) + 1]] <- result
+    }
+  }
+}
+
+# Combine all results
+final_results <- bind_rows(all_results) %>%
+  select(Type, Comparison, Category, Variable, Obs_Diff, CI_lower, CI_upper, Significant)
+
+# Print final result
 print(final_results)
 
-# Optionally save to CSV
-write.csv(final_results, "bootstrap_diff_HKO50_vs_PAI74.csv", row.names = FALSE)
+# Export to CSV in specified folder
+write.csv(
+  final_results,
+  "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/bootstrap_comparisons_inter_intra_plots.csv",
+  row.names = FALSE
+)
