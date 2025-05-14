@@ -265,3 +265,89 @@ write.csv(
 )
 
 
+################################################################################
+########################## Bootstrap Analysis of SGS ###########################
+################################################################################
+
+library(dplyr)
+library(readr)
+
+# Load your CSV file
+file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/Results/PAI74_HKO50/results_HKO50_PAI74_Sp_sign_btw_plot.csv"
+data <- read_csv(file_path, show_col_types = FALSE)
+
+# Create a unique group identifier
+data <- data %>%
+  mutate(Group = paste(Plot, category, sep = "_"))
+
+# Get list of all unique group names
+groups <- unique(data$Group)
+group_comparisons <- combn(groups, 2, simplify = FALSE)
+
+# Initialize bootstrap parameters
+n_iter <- 10000
+set.seed(123)
+results <- list()
+
+# Loop over all group comparisons
+for (comp in group_comparisons) {
+  g1 <- comp[1]
+  g2 <- comp[2]
+  
+  b1 <- data %>% filter(Group == g1) %>% pull(b_log)
+  b2 <- data %>% filter(Group == g2) %>% pull(b_log)
+  
+  # Skip if one group is empty
+  if (length(b1) == 0 | length(b2) == 0) next
+  
+  # Compute observed difference
+  obs_diff <- mean(b2, na.rm = TRUE) - mean(b1, na.rm = TRUE)
+  
+  # Bootstrap
+  boot_diffs <- replicate(n_iter, {
+    mean(sample(b2, size = length(b2), replace = TRUE)) -
+      mean(sample(b1, size = length(b1), replace = TRUE))
+  })
+  
+  # Confidence interval and significance
+  ci <- quantile(boot_diffs, c(0.025, 0.975), na.rm = TRUE)
+  significant <- !(0 >= ci[1] & 0 <= ci[2])
+  
+  # Store result
+  results[[length(results) + 1]] <- data.frame(
+    Group1 = g1,
+    Group2 = g2,
+    Obs_Diff = obs_diff,
+    CI_lower = ci[1],
+    CI_upper = ci[2],
+    Significant = significant
+  )
+}
+
+# Combine all results
+final_results <- bind_rows(results)
+
+# View results
+print(final_results)
+
+# Optional: export to CSV
+write.csv(
+  final_results,
+  "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrap_b_log_comparisons.csv",
+  row.names = FALSE
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
