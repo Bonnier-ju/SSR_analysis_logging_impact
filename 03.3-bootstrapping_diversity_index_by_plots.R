@@ -338,15 +338,92 @@ write.csv(
 )
 
 
+################################################################################
+########################### Final plot visualization ###########################
+################################################################################
+
+# Load libraries
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+# Load the CSV file
+file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrap_comparisons_inter_intra_plots.csv"
+df <- read_csv(file_path, show_col_types = FALSE)
+
+# Filter only comparisons between PAI74 and HKO50
+df_inter <- df %>%
+  filter(grepl("PAI74 vs HKO50", Comparison))
+
+df_inter <- df_inter %>%
+  mutate(
+    Category = factor(Category, levels = c(
+      "All cohorts confounded", "SED", "INT", "ADL"
+    )),
+    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S"))
+  )
+
+# Plot PAI74 vs HKO50
+ggplot(df_inter, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
+  geom_col(position = "dodge", width = 0.7) +
+  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), width = 0.2) +
+  facet_wrap(~ Category, scales = "free_x") +
+  scale_fill_manual(values = c("TRUE" = "tomato", "FALSE" = "grey70")) +
+  labs(
+    title = "Differences between PAI74 and HKO50",
+    x = "Genetic indicator",
+    y = "Observed difference",
+    fill = "Significant"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
+# Plot PAI74 only by cohorts
+df_pai74 <- df %>%
+  filter(Type == "Intra-plot" & grepl("^PAI74", Comparison)) %>%
+  mutate(
+    Category = factor(Category, levels = c("SED vs INT", "SED vs ADL", "INT vs ADL")),
+    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S"))
+  )
 
 
+ggplot(df_pai74, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
+  geom_col(position = "dodge", width = 0.7) +
+  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), width = 0.2) +
+  facet_wrap(~ Category, scales = "free_x") +
+  scale_fill_manual(values = c("TRUE" = "tomato", "FALSE" = "grey70")) +
+  labs(
+    title = "Intra-plot comparisons within PAI74",
+    x = "Genetic indicator",
+    y = "Observed difference",
+    fill = "Significant"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot HKO50 only by cohorts
+df_hko50 <- df %>%
+  filter(Type == "Intra-plot" & grepl("^HKO50", Comparison)) %>%
+  mutate(
+    Category = factor(Category, levels = c("SED vs INT", "SED vs ADL", "INT vs ADL")),
+    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S"))
+  )
 
 
-
-
-
+ggplot(df_hko50, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
+  geom_col(position = "dodge", width = 0.7) +
+  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), width = 0.2) +
+  facet_wrap(~ Category, scales = "free_x") +
+  scale_fill_manual(values = c("TRUE" = "tomato", "FALSE" = "grey70")) +
+  labs(
+    title = "Intra-plot comparisons within HKO50",
+    x = "Genetic indicator",
+    y = "Observed difference",
+    fill = "Significant"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
 
