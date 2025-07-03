@@ -358,7 +358,7 @@ df_inter <- df %>%
 df_inter <- df_inter %>%
   mutate(
     Category = factor(Category, levels = c(
-      "All cohorts confounded", "SED", "INT", "ADL"
+      "All categories confounded", "SED", "INT", "ADL"
     )),
     Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S"))
   )
