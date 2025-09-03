@@ -10,11 +10,13 @@ library(ggplot2)
 library(logistf)
 
 # File paths
-base_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Echantillonnage/Regina/Données initiales/"
-tree_data_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Data/PAI74/PAI74_tree_info.csv"
+base_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Echantillonnage/Regina/Données initiales/"
+tree_data_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Data/PAI74/PAI74_tree_info.csv"
+isolines_path <- "C:/Users/bonni/Desktop/Fichiers_cartes_Qgis/Isolignes/Isolignes_Regina_5m/SUb_sample_isoligne_regina.shp"
+
 
 gaps_path <- paste0(base_path, "REG74_trouées_abattage.shp")
-roads_path <- paste0(base_path, "REG74_pistes_total.shp")
+roads_path <- paste0(base_path, "REG74_pistes_total_ajuste.shp")
 landings_path <- paste0(base_path, "REG74_places_dépot.shp")
 
 # Read shapefiles
@@ -58,14 +60,30 @@ firth_model <- logistf(in_any_opening ~ in_gap + in_road + in_landing, data = se
 summary(firth_model)
 
 ### Ploting results ###
-# Get the bounding box of the seedlings
-bbox <- st_bbox(seedlings)
+#Isolignes management
+isolines <- st_read(isolines_path)
+isolines <- st_transform(isolines, crs = st_crs(gaps))
+
+buffer_zone <- seedlings %>%
+  st_union() %>%
+  st_buffer(dist = 30) 
+
+isolines_cropped <- st_intersection(isolines, buffer_zone)
+
 
 # Plot: cropped to sampling zone
+bbox <- st_bbox(buffer_zone)
+margin_x <- 100
+margin_y <- 50
+xlim <- c(bbox["xmin"] - margin_x, bbox["xmax"] + margin_x)
+ylim <- c(bbox["ymin"] - margin_y, bbox["ymax"] - margin_y)
+
+
 ggplot() +
   geom_sf(data = gaps, fill = "lightgreen", color = NA, alpha = 0.5) +
   geom_sf(data = roads, fill = "orange", color = NA, alpha = 0.5) +
   geom_sf(data = landings, fill = "sienna", color = NA, alpha = 0.6) +
+  geom_sf(data = isolines, color = "grey75", size = 0.3, alpha = 0.6) + 
   
   geom_sf(data = seedlings, aes(color = in_any_opening), size = 1.8, shape = 21, stroke = 0.3, fill = "white") +
   
@@ -76,21 +94,27 @@ ggplot() +
   ) +
   
   coord_sf(
-    xlim = c(bbox["xmin"], bbox["xmax"]),
-    ylim = c(bbox["ymin"], bbox["ymax"]),
+    xlim = xlim,
+    ylim = ylim,
     expand = FALSE
   ) +
   
   labs(
-    title = "Seedling establishment relative to logging-induced canopy openings",
-    subtitle = "Visualization restricted to seedling sampling zone",
+    title = "Seedling establishment with logging features and topography",
+    subtitle = "Canopy openings and clipped topographic isolines",
     x = "Easting (m)", y = "Northing (m)"
   ) +
   theme_minimal(base_size = 12) +
   theme(
     legend.position = "right",
     plot.title = element_text(face = "bold"),
-    legend.title = element_text(face = "bold")
+    legend.title = element_text(face = "bold"),
+    axis.text = element_text(size = 11),
+    legend.text = element_text(size = 11),
+    panel.grid.major = element_blank(),  # supprime les lignes principales
+    panel.grid.minor = element_blank(),  # supprime les lignes secondaires
+    panel.border = element_blank(),      # pas de cadre parasite
+    axis.ticks = element_line(size = 0.3) # si tu veux conserver les ticks visibles
   )
 
 
