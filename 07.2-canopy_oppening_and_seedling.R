@@ -119,7 +119,7 @@ ggplot() +
 
 
 # Export a CSV of seedling IDs and their canopy status
-output_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Data/PAI74/PAI74_seedlings_canopy_status.csv"
+output_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Data/PAI74/PAI74_seedlings_canopy_status.csv"
 
 seedlings_export <- seedlings %>%
   st_drop_geometry() %>%
@@ -134,7 +134,7 @@ library(sf)
 library(readr)
 
 
-parentage_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo/filtered_data_PAI74.csv"
+parentage_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.3-inferring_mother_haplo/filtered_data_PAI74_full.csv"
 df <- read_csv(parentage_path)
 
 # Convert offspring coordinates to sf object
