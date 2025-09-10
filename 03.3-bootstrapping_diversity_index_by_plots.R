@@ -192,7 +192,7 @@ library(readr)
 library(tidyr)
 
 # Set file path
-file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/Results/PAI74_HKO50/results_HKO50_full_bootstrap_selfing.csv"
+file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/Results/PAI74_HKO50/results_HKO50_PAI74_bootstrap_selfing.csv"
 
 # Read data
 selfing_data <- read_csv(file_path, show_col_types = FALSE)
@@ -348,7 +348,7 @@ library(dplyr)
 library(ggplot2)
 
 # Load the CSV file
-file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrap_comparisons_inter_intra_plots.csv"
+file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrapping/input_files/bootstrap_comparisons_inter_intra_plots.csv"
 df <- read_csv(file_path, show_col_types = FALSE)
 
 # Filter only comparisons between PAI74 and HKO50
@@ -424,6 +424,80 @@ ggplot(df_hko50, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
   ) +
   theme_minimal(base_size = 13) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+
+################################################################################
+########################### Synthetic Panel Plot ###############################
+################################################################################
+
+# Load libraries
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+
+# Load the CSV file
+file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrapping/input_files/bootstrap_comparisons_inter_intra_plots.csv"
+df <- read_csv(file_path, show_col_types = FALSE)
+
+# --- 1. Add % difference relative to reference ---
+# For inter-plot: relative to HKO50 (Group1 always = HKO50, Group2 = PAI74)
+# For intra-plot: relative to the first cohort in the comparison label
+df <- df %>%
+  mutate(
+    Percent_Diff = 100 * Obs_Diff / (abs(Obs_Diff) + abs(CI_upper) + 1e-6), # approx normalization
+    Signif_label = ifelse(Significant, "*", "ns")
+  )
+
+# --- 2. Reorder variables and categories ---
+df <- df %>%
+  mutate(
+    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S")),
+    Category = factor(Category, levels = c(
+      "All categories confounded", "SED", "INT", "ADL",
+      "SED vs INT", "SED vs ADL", "INT vs ADL"
+    ))
+  )
+
+# --- 3. Define plotting function ---
+plot_comparison <- function(data, title_label) {
+  ggplot(data, aes(x = Variable, y = Percent_Diff, fill = Significant)) +
+    geom_col(position = "dodge", width = 0.7) +
+    facet_wrap(~ Category, scales = "free_x") +
+    # Only red (TRUE) and grey (FALSE)
+    scale_fill_manual(values = c("TRUE" = "tomato", "FALSE" = "grey70"),
+                      labels = c("TRUE" = "Significant", "FALSE" = "Not significant")) +
+    labs(
+      title = title_label,
+      x = "Genetic indicator",
+      y = "Observed difference (%)",
+      fill = "Significance"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+
+
+# --- 4. Filter datasets ---
+df_inter   <- df %>% filter(grepl("PAI74 vs HKO50", Comparison))
+df_pai74   <- df %>% filter(Type == "Intra-plot" & grepl("^PAI74", Comparison))
+df_hko50   <- df %>% filter(Type == "Intra-plot" & grepl("^HKO50", Comparison))
+
+# --- 5. Create plots ---
+plot1 <- plot_comparison(df_inter, "PAI74 vs HKO50")
+plot2 <- plot_comparison(df_pai74, "Intra-plot comparisons within PAI74")
+plot3 <- plot_comparison(df_hko50, "Intra-plot comparisons within HKO50")
+
+# --- 6. Combine into a synthetic panel ---
+final_plot <-  plot2 / plot3
+
+# Show plot
+print(final_plot)
+
 
 
 
