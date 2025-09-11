@@ -203,3 +203,129 @@ print(p)
 
 
 
+
+
+
+########################################################################
+################## Dispersal counts within vs between plots ############
+########################################################################
+
+library(readr)
+library(dplyr)
+library(stringr)
+
+
+# ---- 1) Basic sanity: keep rows with available plot info for parents ----
+df_seed  <- df_map %>% filter(!is.na(Plot_Mother), !is.na(Plot_Offspring))
+df_pollen <- df_map %>% filter(!is.na(Plot_Father), !is.na(Plot_Offspring))
+
+# ---- 2) SEED dispersal: mother (source) -> offspring (destination) ----
+seed_counts <- df_seed %>%
+  mutate(
+    flow_type = if_else(Plot_Mother == Plot_Offspring, "within_plot", "between_plots"),
+    direction = paste0(Plot_Mother, " → ", Plot_Offspring)
+  ) %>%
+  count(flow_type, direction, name = "n") %>%
+  arrange(flow_type, desc(n))
+
+# Overall totals for seed
+seed_totals <- df_seed %>%
+  mutate(between = Plot_Mother != Plot_Offspring) %>%
+  summarise(
+    n_total = n(),
+    n_within = sum(!between),
+    n_between = sum(between),
+    pct_between = round(100 * n_between / n_total, 1)
+  )
+
+# Optional: mean distances by flow_type (useful QA)
+seed_distance_summary <- df_seed %>%
+  mutate(flow_type = if_else(Plot_Mother == Plot_Offspring, "within_plot", "between_plots")) %>%
+  group_by(flow_type) %>%
+  summarise(
+    n = n(),
+    mean_distance_m = mean(Distance_To_Mother, na.rm = TRUE),
+    median_distance_m = median(Distance_To_Mother, na.rm = TRUE),
+    max_distance_m = max(Distance_To_Mother, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# ---- 3) POLLEN dispersal: father (source) -> offspring (destination) ----
+pollen_counts <- df_pollen %>%
+  mutate(
+    flow_type = if_else(Plot_Father == Plot_Offspring, "within_plot", "between_plots"),
+    direction = paste0(Plot_Father, " → ", Plot_Offspring)
+  ) %>%
+  count(flow_type, direction, name = "n") %>%
+  arrange(flow_type, desc(n))
+
+# Overall totals for pollen
+pollen_totals <- df_pollen %>%
+  mutate(between = Plot_Father != Plot_Offspring) %>%
+  summarise(
+    n_total = n(),
+    n_within = sum(!between),
+    n_between = sum(between),
+    pct_between = round(100 * n_between / n_total, 1)
+  )
+
+# Optional: mean distances by flow_type (useful QA)
+pollen_distance_summary <- df_pollen %>%
+  mutate(flow_type = if_else(Plot_Father == Plot_Offspring, "within_plot", "between_plots")) %>%
+  group_by(flow_type) %>%
+  summarise(
+    n = n(),
+    mean_distance_m = mean(Distance_To_Father, na.rm = TRUE),
+    median_distance_m = median(Distance_To_Father, na.rm = TRUE),
+    max_distance_m = max(Distance_To_Father, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# ---- 4) Nice 2x2 directional matrices (HKO50 vs PAI74) ----
+# Seed matrix: rows = source (Mother plot), cols = destination (Offspring plot)
+seed_matrix <- df_seed %>%
+  count(Plot_Mother, Plot_Offspring, name = "n") %>%
+  tidyr::pivot_wider(names_from = Plot_Offspring, values_from = n, values_fill = 0) %>%
+  arrange(Plot_Mother)
+
+# Pollen matrix: rows = source (Father plot), cols = destination (Offspring plot)
+pollen_matrix <- df_pollen %>%
+  count(Plot_Father, Plot_Offspring, name = "n") %>%
+  tidyr::pivot_wider(names_from = Plot_Offspring, values_from = n, values_fill = 0) %>%
+  arrange(Plot_Father)
+
+# ---- 5) Print quick summaries to console ----
+cat("\n=== SEED dispersal (mother → offspring) ===\n")
+print(seed_totals)
+print(seed_counts)
+print(seed_distance_summary)
+
+cat("\n=== POLLEN dispersal (father → offspring) ===\n")
+print(pollen_totals)
+print(pollen_counts)
+print(pollen_distance_summary)
+
+cat("\n=== Directional matrices ===\n")
+cat("\n[SEED] rows = Mother plot, cols = Offspring plot\n")
+print(seed_matrix)
+cat("\n[POLLEN] rows = Father plot, cols = Offspring plot\n")
+print(pollen_matrix)
+
+# ---- 6) (Optional) Export summaries to CSV next to your map outputs ----
+out_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+readr::write_csv(seed_counts, file.path(out_dir, "seed_counts_direction.csv"))
+readr::write_csv(seed_totals, file.path(out_dir, "seed_totals.csv"))
+readr::write_csv(seed_distance_summary, file.path(out_dir, "seed_distance_summary.csv"))
+
+readr::write_csv(pollen_counts, file.path(out_dir, "pollen_counts_direction.csv"))
+readr::write_csv(pollen_totals, file.path(out_dir, "pollen_totals.csv"))
+readr::write_csv(pollen_distance_summary, file.path(out_dir, "pollen_distance_summary.csv"))
+
+readr::write_csv(seed_matrix, file.path(out_dir, "seed_direction_matrix.csv"))
+readr::write_csv(pollen_matrix, file.path(out_dir, "pollen_direction_matrix.csv"))
+
+
+
+
+
+
