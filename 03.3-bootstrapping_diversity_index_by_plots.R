@@ -427,8 +427,6 @@ ggplot(df_hko50, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
 
 
 
-
-
 ################################################################################
 ########################### Synthetic Panel Plot ###############################
 ################################################################################
@@ -436,40 +434,20 @@ ggplot(df_hko50, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
 # Load libraries
 library(readr)
 library(dplyr)
+library(stringr)
 library(ggplot2)
 library(patchwork)
 
-# Load the CSV file
-file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrapping/input_files/bootstrap_comparisons_inter_intra_plots.csv"
-df <- read_csv(file_path, show_col_types = FALSE)
-
-# --- 1. Add % difference relative to reference ---
-# For inter-plot: relative to HKO50 (Group1 always = HKO50, Group2 = PAI74)
-# For intra-plot: relative to the first cohort in the comparison label
-df <- df %>%
-  mutate(
-    Percent_Diff = 100 * Obs_Diff / (abs(Obs_Diff) + abs(CI_upper) + 1e-6), # approx normalization
-    Signif_label = ifelse(Significant, "*", "ns")
-  )
-
-# --- 2. Reorder variables and categories ---
-df <- df %>%
-  mutate(
-    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S")),
-    Category = factor(Category, levels = c(
-      "All categories confounded", "SED", "INT", "ADL",
-      "SED vs INT", "SED vs ADL", "INT vs ADL"
-    ))
-  )
-
-# --- 3. Define plotting function ---
+# --------------------------- 0) Helper function ------------------------------
+# Common plotting function: percent-scale, red (signif) vs grey (ns), no CI
 plot_comparison <- function(data, title_label) {
   ggplot(data, aes(x = Variable, y = Percent_Diff, fill = Significant)) +
-    geom_col(position = "dodge", width = 0.7) +
+    geom_col(width = 0.7) +
     facet_wrap(~ Category, scales = "free_x") +
-    # Only red (TRUE) and grey (FALSE)
-    scale_fill_manual(values = c("TRUE" = "tomato", "FALSE" = "grey70"),
-                      labels = c("TRUE" = "Significant", "FALSE" = "Not significant")) +
+    scale_fill_manual(
+      values = c("TRUE" = "tomato", "FALSE" = "grey70"),
+      labels = c("TRUE" = "Significant", "FALSE" = "Not significant")
+    ) +
     labs(
       title = title_label,
       x = "Genetic indicator",
@@ -480,23 +458,65 @@ plot_comparison <- function(data, title_label) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
+# --------------------------- 1) Load main CSV --------------------------------
+file_main <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrapping/input_files/bootstrap_comparisons_inter_intra_plots.csv"
+df <- read_csv(file_main, show_col_types = FALSE)
 
+# --- 1. Add % difference (visual scale) & tidy factors ---
+# NOTE: Percent_Diff is a visual normalization since true reference means
+# are not provided for every comparison. We do NOT draw CIs in percent plots.
+df <- df %>%
+  mutate(
+    Percent_Diff = 100 * Obs_Diff / (abs(Obs_Diff) + abs(CI_upper) + 1e-6),
+    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S")),
+    Category = factor(
+      Category,
+      levels = c("All categories confounded", "JUV", "INT", "ADL",
+                 "JUV vs INT", "JUV vs ADL", "INT vs ADL")
+    )
+  )
 
-# --- 4. Filter datasets ---
-df_inter   <- df %>% filter(grepl("PAI74 vs HKO50", Comparison))
-df_pai74   <- df %>% filter(Type == "Intra-plot" & grepl("^PAI74", Comparison))
-df_hko50   <- df %>% filter(Type == "Intra-plot" & grepl("^HKO50", Comparison))
+# --------------------------- 2) Subsets & plots (main) ------------------------
+df_inter <- df %>% filter(grepl("PAI74 vs HKO50", Comparison))
+df_pai74 <- df %>% filter(Type == "Intra-plot" & str_starts(Comparison, "PAI74"))
+df_hko50 <- df %>% filter(Type == "Intra-plot" & str_starts(Comparison, "HKO50"))
 
-# --- 5. Create plots ---
 plot1 <- plot_comparison(df_inter, "PAI74 vs HKO50")
 plot2 <- plot_comparison(df_pai74, "Intra-plot comparisons within PAI74")
 plot3 <- plot_comparison(df_hko50, "Intra-plot comparisons within HKO50")
 
-# --- 6. Combine into a synthetic panel ---
-final_plot <-  plot2 / plot3
-
-# Show plot
+final_plot <- plot2 / plot3
 print(final_plot)
+
+
+# --------------------------- 3) Load extra CSV for plot4 ----------------------
+file_extra <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrapping/results/results_boostrapping_PAI74_ADL_log_unlog.csv"
+df_extra <- read_csv(file_extra, show_col_types = FALSE)
+
+# Ensure required columns exist (minimally: Comparison, Category, Variable, Obs_Diff, Significant)
+required_cols <- c("Comparison","Category","Variable","Obs_Diff","Significant")
+missing_req <- setdiff(required_cols, names(df_extra))
+if (length(missing_req) > 0) {
+  stop(paste0("The extra CSV is missing required columns: ", paste(missing_req, collapse = ", ")))
+}
+
+# Optional CI columns; create if missing (not plotted but used in scale formula)
+if (!"CI_upper" %in% names(df_extra)) df_extra$CI_upper <- 0
+
+# Prepare percent view and factors for plot4
+df_extra <- df_extra %>%
+  mutate(
+    Percent_Diff = 100 * Obs_Diff / (abs(Obs_Diff) + abs(CI_upper) + 1e-6),
+    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S")),
+    # If Category not already explicit, set a sensible label:
+    Category = ifelse(is.na(Category) | Category == "",
+                      "ADL (logged vs unlogged)", Category),
+    Category = factor(Category)
+  )
+
+plot4 <- plot_comparison(df_extra, "PAI74 ADL: logged vs unlogged")
+
+
 
 
 
