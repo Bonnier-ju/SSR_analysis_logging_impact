@@ -326,6 +326,280 @@ readr::write_csv(pollen_matrix, file.path(out_dir, "pollen_direction_matrix.csv"
 
 
 
+########################################################################
+############ Parental reproductive success & dispersal distances #######
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+
+# ------------------ Read ------------------
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ SEED (mothers) ------------------
+mother_summary <- df_map %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID) %>%
+  summarise(
+    n_offspring = n(),                                   # number of offspring
+    mean_distance = mean(Distance_To_Mother, na.rm = TRUE), # mean dispersal distance
+    median_distance = median(Distance_To_Mother, na.rm = TRUE),
+    max_distance = max(Distance_To_Mother, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(Plot_Mother, desc(n_offspring))
+
+# ------------------ POLLEN (fathers) ------------------
+father_summary <- df_map %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
+  group_by(Plot_Father, Father_ID) %>%
+  summarise(
+    n_offspring = n(),
+    mean_distance = mean(Distance_To_Father, na.rm = TRUE),
+    median_distance = median(Distance_To_Father, na.rm = TRUE),
+    max_distance = max(Distance_To_Father, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(Plot_Father, desc(n_offspring))
+
+# ------------------ EXPORT ------------------
+write_csv(mother_summary, file.path(output_dir, "mother_reproductive_success.csv"))
+write_csv(father_summary, file.path(output_dir, "father_reproductive_success.csv"))
+
+# ------------------ QUICK OVERVIEW ------------------
+cat("\n=== Mothers ===\n")
+print(head(mother_summary, 10))
+cat("\n=== Fathers ===\n")
+print(head(father_summary, 10))
+
+
+# Define custom colors for plots
+plot_colors <- c("HKO50" = "#CDAD00", "PAI74" = "mediumorchid4")
+
+# ------------------ Visualisation: number of offspring ------------------
+p1 <- ggplot(mother_summary, aes(x = Plot_Mother, y = n_offspring, fill = Plot_Mother)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = plot_colors) +
+  theme_minimal() +
+  labs(title = "Number of offspring per mother", x = "Plot", y = "Offspring count")
+
+p2 <- ggplot(father_summary, aes(x = Plot_Father, y = n_offspring, fill = Plot_Father)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = plot_colors) +
+  theme_minimal() +
+  labs(title = "Number of offspring per father", x = "Plot", y = "Offspring count")
+
+# ------------------ Visualisation: mean dispersal distances ------------------
+p3 <- ggplot(mother_summary, aes(x = Plot_Mother, y = mean_distance, fill = Plot_Mother)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = plot_colors) +
+  theme_minimal() +
+  labs(title = "Mean seed dispersal distance per mother", x = "Plot", y = "Distance (m)")
+
+p4 <- ggplot(father_summary, aes(x = Plot_Father, y = mean_distance, fill = Plot_Father)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = plot_colors) +
+  theme_minimal() +
+  labs(title = "Mean pollen dispersal distance per father", x = "Plot", y = "Distance (m)")
+
+# ------------------ Visualisation: density plots (dispersal distances) ------------------
+p5 <- ggplot(df_map, aes(x = Distance_To_Mother, fill = Plot_Mother, color = Plot_Mother)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_manual(values = plot_colors) +
+  scale_color_manual(values = plot_colors) +
+  scale_x_continuous(limits = c(0, 2000)) +
+  theme_minimal() +
+  labs(title = "Distribution of seed dispersal distances", x = "Distance (m)", y = "Density")
+
+p6 <- ggplot(df_map, aes(x = Distance_To_Father, fill = Plot_Father, color = Plot_Father)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_manual(values = plot_colors) +
+  scale_color_manual(values = plot_colors) +
+  scale_x_continuous(limits = c(0, 2000)) +
+  theme_minimal() +
+  labs(title = "Distribution of pollen dispersal distances", x = "Distance (m)", y = "Density")
+
+
+
+########################################################################
+############# Statistical comparison between plots #####################
+########################################################################
+
+# ---- Mothers: number of offspring ----
+wilcox_mother_offspring <- wilcox.test(
+  n_offspring ~ Plot_Mother,
+  data = mother_summary
+)
+cat("\n[Wilcoxon] Number of offspring per mother (HKO50 vs PAI74):\n")
+print(wilcox_mother_offspring)
+
+# ---- Fathers: number of offspring ----
+wilcox_father_offspring <- wilcox.test(
+  n_offspring ~ Plot_Father,
+  data = father_summary
+)
+cat("\n[Wilcoxon] Number of offspring per father (HKO50 vs PAI74):\n")
+print(wilcox_father_offspring)
+
+# ---- Mothers: mean dispersal distance ----
+wilcox_mother_distance <- wilcox.test(
+  mean_distance ~ Plot_Mother,
+  data = mother_summary
+)
+cat("\n[Wilcoxon] Mean seed dispersal distance per mother (HKO50 vs PAI74):\n")
+print(wilcox_mother_distance)
+
+# ---- Fathers: mean dispersal distance ----
+wilcox_father_distance <- wilcox.test(
+  mean_distance ~ Plot_Father,
+  data = father_summary
+)
+cat("\n[Wilcoxon] Mean pollen dispersal distance per father (HKO50 vs PAI74):\n")
+print(wilcox_father_distance)
+
+
+########################################################################
+########## Combined plot: seed vs pollen dispersal by plot #############
+########################################################################
+
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+# ---- Reshape data into long format ----
+df_long <- df_map %>%
+  select(Plot_Offspring, Plot_Mother, Distance_To_Mother,
+         Plot_Father, Distance_To_Father) %>%
+  # Gather seed and pollen distances into one column
+  pivot_longer(
+    cols = c(Distance_To_Mother, Distance_To_Father),
+    names_to = "type",
+    values_to = "distance"
+  ) %>%
+  mutate(
+    type = ifelse(type == "Distance_To_Mother", "Seed", "Pollen"),
+    plot = ifelse(type == "Seed", Plot_Mother, Plot_Father)
+  ) %>%
+  filter(!is.na(distance), !is.na(plot))
+
+
+# Combined boxplot 
+p_combined_box <- ggplot(df_long, aes(x = type, y = distance, fill = type)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ plot, ncol = 2) +
+  scale_fill_manual(values = c("Seed" = "tan1", "Pollen" = "#F0E68C")) +
+  scale_y_continuous(limits = c(0, 2000)) +
+  theme_minimal() +
+  labs(title = "Seed vs Pollen dispersal distances per plot",
+       x = "Dispersal type", y = "Distance (m)")
+
+print(p_combined_box)
+
+
+########################################################################
+########## Barplots of reproductive success per parent #################
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+
+# ------------------ Read ------------------
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ Custom plot colors ------------------
+plot_colors <- c("HKO50" = "#CDAD00", "PAI74" = "mediumorchid4")
+
+# ------------------ Summaries ------------------
+mother_summary <- df_map %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+father_summary <- df_map %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
+  group_by(Plot_Father, Father_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# ------------------ Function for plotting ------------------
+plot_bar <- function(data, id_col, plot_col, title) {
+  data <- data %>%
+    arrange(desc(n_offspring)) %>%
+    slice_head(n = 25)
+  
+  id_var <- sym(id_col)
+  plot_var <- sym(plot_col)
+  
+  id_levels <- data %>%
+    arrange(desc(n_offspring)) %>%
+    pull(!!id_var) %>%
+    unique()
+  
+  data <- data %>%
+    mutate(!!id_var := factor(!!id_var, levels = id_levels))
+  
+  ggplot(data, aes(x = !!id_var, y = n_offspring, fill = !!plot_var)) +
+    geom_col() +
+    scale_fill_manual(values = plot_colors, name = "Plot") +
+    theme_minimal(base_size = 14) +  # increase global base font size
+    theme(
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12),
+      axis.text.y = element_text(size = 14),
+      axis.title.x = element_text(size = 16, face = "bold"),
+      axis.title.y = element_text(size = 16, face = "bold"),
+      legend.text  = element_text(size = 14),
+      legend.title = element_text(size = 14, face = "bold"),
+      plot.title   = element_text(size = 15, face = "bold")
+    ) +
+    labs(title = title, x = "Parent ID", y = "Number of offspring")
+}
+
+
+# Mothers HKO50
+p_mother_hko50 <- plot_bar(
+  mother_summary %>% filter(Plot_Mother == "HKO50"),
+  id_col = "Mother_ID", plot_col = "Plot_Mother",
+  title = "Top 25 mothers - HKO50"
+)
+
+# Mothers PAI74
+p_mother_pai74 <- plot_bar(
+  mother_summary %>% filter(Plot_Mother == "PAI74"),
+  id_col = "Mother_ID", plot_col = "Plot_Mother",
+  title = "Top 25 mothers - PAI74"
+)
+
+# Fathers HKO50
+p_father_hko50 <- plot_bar(
+  father_summary %>% filter(Plot_Father == "HKO50"),
+  id_col = "Father_ID", plot_col = "Plot_Father",
+  title = "Top 25 fathers - HKO50"
+)
+
+# Fathers PAI74
+p_father_pai74 <- plot_bar(
+  father_summary %>% filter(Plot_Father == "PAI74"),
+  id_col = "Father_ID", plot_col = "Plot_Father",
+  title = "Top 25 fathers - PAI74"
+)
+
+# ------------------ Save plots ------------------
+ggsave(file.path(output_dir, "barplot_mothers_HKO50.png"), p_mother_hko50, width = 11, height = 7, dpi = 300, bg = "white")
+ggsave(file.path(output_dir, "barplot_mothers_PAI74.png"), p_mother_pai74, width = 11, height = 7, dpi = 300, bg = "white")
+ggsave(file.path(output_dir, "barplot_fathers_HKO50.png"), p_father_hko50, width = 11, height = 7, dpi = 300, bg = "white")
+ggsave(file.path(output_dir, "barplot_fathers_PAI74.png"), p_father_pai74, width = 11, height = 7, dpi = 300, bg = "white")
+
+
+
 
 
 
