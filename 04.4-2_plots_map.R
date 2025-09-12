@@ -807,4 +807,97 @@ cat("P-value fathers (HKO50 vs PAI74):", pval_fathers, "\n")
 
 
 
+########################################################################
+### DBH vs reproductive success and dispersal distance #################
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+
+# ------------------ Read ------------------
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ Summaries ------------------
+# Mothers: number of offspring + mean dispersal distance per mother
+mother_summary <- df_map %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID, DBH_Mother) %>%
+  summarise(
+    n_offspring = n(),
+    mean_distance = mean(Distance_To_Mother, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Fathers: number of offspring + mean dispersal distance per father
+father_summary <- df_map %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
+  group_by(Plot_Father, Father_ID, DBH_Father) %>%
+  summarise(
+    n_offspring = n(),
+    mean_distance = mean(Distance_To_Father, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# ------------------ Visualisation ------------------
+# 1. Mothers: DBH vs number of offspring
+p1 <- ggplot(mother_summary, aes(x = DBH_Mother, y = n_offspring, color = Plot_Mother)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_color_manual(values = c("HKO50" = "#CDAD00", "PAI74" = "mediumorchid4")) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Mothers: DBH vs reproductive success",
+       x = "DBH (cm)", y = "Number of offspring", color = "Plot")
+
+# 2. Mothers: DBH vs mean seed dispersal distance
+p2 <- ggplot(mother_summary, aes(x = DBH_Mother, y = mean_distance, color = Plot_Mother)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_color_manual(values = c("HKO50" = "#CDAD00", "PAI74" = "mediumorchid4")) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Mothers: DBH vs mean seed dispersal distance",
+       x = "DBH (cm)", y = "Mean seed dispersal distance (m)", color = "Plot")
+
+# 3. Fathers: DBH vs number of offspring
+p3 <- ggplot(father_summary, aes(x = DBH_Father, y = n_offspring, color = Plot_Father)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_color_manual(values = c("HKO50" = "#CDAD00", "PAI74" = "mediumorchid4")) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Fathers: DBH vs reproductive success",
+       x = "DBH (cm)", y = "Number of offspring", color = "Plot")
+
+# 4. Fathers: DBH vs mean pollen dispersal distance
+p4 <- ggplot(father_summary, aes(x = DBH_Father, y = mean_distance, color = Plot_Father)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_color_manual(values = c("HKO50" = "#CDAD00", "PAI74" = "mediumorchid4")) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Fathers: DBH vs mean pollen dispersal distance",
+       x = "DBH (cm)", y = "Mean pollen dispersal distance (m)", color = "Plot")
+
+# ------------------ Save ------------------
+ggsave(file.path(output_dir, "dbh_vs_offspring_mothers.png"), p1, width = 8, height = 6, dpi = 300)
+ggsave(file.path(output_dir, "dbh_vs_distance_mothers.png"), p2, width = 8, height = 6, dpi = 300)
+ggsave(file.path(output_dir, "dbh_vs_offspring_fathers.png"), p3, width = 8, height = 6, dpi = 300)
+ggsave(file.path(output_dir, "dbh_vs_distance_fathers.png"), p4, width = 8, height = 6, dpi = 300)
+
+# ------------------ Statistics ------------------
+# Linear models per plot (example: mothers, offspring count)
+lm_mothers_offspring <- lm(n_offspring ~ DBH_Mother * Plot_Mother, data = mother_summary)
+lm_mothers_distance  <- lm(mean_distance ~ DBH_Mother * Plot_Mother, data = mother_summary)
+
+lm_fathers_offspring <- lm(n_offspring ~ DBH_Father * Plot_Father, data = father_summary)
+lm_fathers_distance  <- lm(mean_distance ~ DBH_Father * Plot_Father, data = father_summary)
+
+summary(lm_mothers_offspring)
+summary(lm_mothers_distance)
+summary(lm_fathers_offspring)
+summary(lm_fathers_distance)
+
+
 
