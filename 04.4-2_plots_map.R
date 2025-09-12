@@ -602,4 +602,209 @@ ggsave(file.path(output_dir, "barplot_fathers_PAI74.png"), p_father_pai74, width
 
 
 
+########################################################################
+########## Gini index of reproductive success (inequality) #############
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ineq)  # for Gini index
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+
+# ------------------ Read ------------------
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ Summaries ------------------
+# Mothers
+mother_summary <- df_map %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# Fathers
+father_summary <- df_map %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
+  group_by(Plot_Father, Father_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# ------------------ Compute Gini index ------------------
+# Mothers
+gini_mothers <- mother_summary %>%
+  group_by(Plot_Mother) %>%
+  summarise(Gini = Gini(n_offspring), .groups = "drop") %>%
+  mutate(Group = paste0("Mothers_", Plot_Mother))
+
+# Fathers
+gini_fathers <- father_summary %>%
+  group_by(Plot_Father) %>%
+  summarise(Gini = Gini(n_offspring), .groups = "drop") %>%
+  mutate(Group = paste0("Fathers_", Plot_Father))
+
+# Combine
+gini_results <- bind_rows(gini_mothers %>% rename(Plot = Plot_Mother),
+                          gini_fathers %>% rename(Plot = Plot_Father))
+
+
+
+
+
+
+########################################################################
+############## Lorenz curves for reproductive success ##################
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ineq)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+
+# ------------------ Read ------------------
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ Summaries ------------------
+# Mothers
+mother_summary <- df_map %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# Fathers
+father_summary <- df_map %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
+  group_by(Plot_Father, Father_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# ------------------ Lorenz function ------------------
+compute_lorenz_df <- function(data, plot_name, group) {
+  lc <- Lc(data$n_offspring)
+  data.frame(
+    p = lc$p,   # cumulative proportion of parents
+    L = lc$L,   # cumulative proportion of offspring
+    Plot = plot_name,
+    Group = group
+  )
+}
+
+# Compute Lorenz curves
+lorenz_data <- bind_rows(
+  compute_lorenz_df(mother_summary %>% filter(Plot_Mother == "HKO50"), "HKO50", "Mothers"),
+  compute_lorenz_df(mother_summary %>% filter(Plot_Mother == "PAI74"), "PAI74", "Mothers"),
+  compute_lorenz_df(father_summary %>% filter(Plot_Father == "HKO50"), "HKO50", "Fathers"),
+  compute_lorenz_df(father_summary %>% filter(Plot_Father == "PAI74"), "PAI74", "Fathers")
+)
+
+# ------------------ Colors for plots ------------------
+plot_colors <- c("HKO50" = "#CDAD00", "PAI74" = "mediumorchid4")
+
+# ------------------ Plot Lorenz curves ------------------
+p_lorenz <- ggplot(lorenz_data, aes(x = p, y = L, color = Plot, linetype = Group)) +
+  geom_line(size = 1.2) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey50") +
+  scale_color_manual(values = plot_colors) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.title = element_text(size = 14, face = "bold"),
+    legend.title = element_text(size = 13, face = "bold"),
+    legend.text = element_text(size = 12),
+    plot.title = element_text(size = 15, face = "bold")
+  ) +
+  labs(
+    title = "Lorenz curves of reproductive success",
+    x = "Cumulative proportion of parents",
+    y = "Cumulative proportion of offspring",
+    color = "Plot",
+    linetype = "Group"
+  )
+
+print(p_lorenz)
+
+# ------------------ Save ------------------
+ggsave(file.path(output_dir, "lorenz_curves.png"), p_lorenz, width = 8, height = 6, dpi = 300, bg = "white")
+
+
+
+
+
+########################################################################
+############ Bootstrap test for differences in Gini index ##############
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ineq)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+
+# ------------------ Read ------------------
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ Summaries ------------------
+# Mothers
+mother_summary <- df_map %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# Fathers
+father_summary <- df_map %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
+  group_by(Plot_Father, Father_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# ------------------ Bootstrap function ------------------
+bootstrap_gini <- function(values, n_iter = 1000) {
+  replicate(n_iter, {
+    resample <- sample(values, replace = TRUE)
+    Gini(resample)
+  })
+}
+
+# ------------------ Run bootstrap ------------------
+set.seed(123)
+
+# Mothers
+gini_mothers_HKO50 <- bootstrap_gini(mother_summary %>% filter(Plot_Mother == "HKO50") %>% pull(n_offspring))
+gini_mothers_PAI74 <- bootstrap_gini(mother_summary %>% filter(Plot_Mother == "PAI74") %>% pull(n_offspring))
+
+# Fathers
+gini_fathers_HKO50 <- bootstrap_gini(father_summary %>% filter(Plot_Father == "HKO50") %>% pull(n_offspring))
+gini_fathers_PAI74 <- bootstrap_gini(father_summary %>% filter(Plot_Father == "PAI74") %>% pull(n_offspring))
+
+# ------------------ Compare distributions ------------------
+# p-value = proportion of bootstrap differences crossing 0
+pval_mothers <- mean((gini_mothers_HKO50 - gini_mothers_PAI74) <= 0) * 2
+pval_fathers <- mean((gini_fathers_HKO50 - gini_fathers_PAI74) <= 0) * 2
+
+# ------------------ Summary ------------------
+results <- data.frame(
+  Group = c("Mothers HKO50", "Mothers PAI74", "Fathers HKO50", "Fathers PAI74"),
+  Mean_Gini = c(mean(gini_mothers_HKO50),
+                mean(gini_mothers_PAI74),
+                mean(gini_fathers_HKO50),
+                mean(gini_fathers_PAI74)),
+  SD_Gini = c(sd(gini_mothers_HKO50),
+              sd(gini_mothers_PAI74),
+              sd(gini_fathers_HKO50),
+              sd(gini_fathers_PAI74))
+)
+
+cat("\nBootstrap comparison of Gini index:\n")
+print(results)
+
+cat("\nP-value mothers (HKO50 vs PAI74):", pval_mothers, "\n")
+cat("P-value fathers (HKO50 vs PAI74):", pval_fathers, "\n")
+
+
+
+
+
 
