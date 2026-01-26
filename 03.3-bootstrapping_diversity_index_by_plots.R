@@ -1,34 +1,77 @@
-################################################################################
-##################### Bootstrap Analysis of Genetic Indices ####################
-################################################################################
+# ============================================================
+# Script: 03.3-bootstrapping_diversity_index_by_plots.R
+# Purpose: Bootstrap comparisons of genetic indices (AR, He, Ho, Fi), selfing (S), and SGS slope (b-log / Sp) across plots and cohorts.
+# Manuscript: Logging impact (HKO50 vs PAI74) – SSR analyses
+# Inputs: Bootstrap CSV files from SPAGeDi (diversity, selfing, SGS)
+# Outputs: results/03_bootstrap/*.csv ; figures/03_bootstrap/*.png
+# Figures/Tables: Bootstrap comparison plots (inter-plot and intra-plot)
+# Last update: 2026-01-26
+# ============================================================
 
-# Load required packages
+## ===================== PARAMETERS =====================
+base_path <- "."
+
+# ---- Diversity bootstrap inputs (per plot) ----
+file_pai <- file.path(base_path, "results", "spagedi", "PAI74", "results_PAI74_full_bootstrap.csv")
+file_hko <- file.path(base_path, "results", "spagedi", "HKO50", "results_HKO50_full_bootstrap.csv")
+
+# ---- Selfing bootstrap input (both plots together) ----
+file_selfing <- file.path(base_path, "results", "spagedi", "PAI74_HKO50", "results_HKO50_PAI74_bootstrap_selfing.csv")
+
+# ---- SGS bootstrap input (b-log / Sp comparisons) ----
+file_sgs <- file.path(base_path, "results", "spagedi", "PAI74_HKO50", "results_HKO50_PAI74_Sp_sign_btw_plot.csv")
+
+# ---- Main output dirs ----
+out_dir <- file.path("results", "03_bootstrap")
+fig_dir <- file.path("figures", "03_bootstrap")
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
+
+# ---- Output files ----
+out_diversity_csv <- file.path(out_dir, "bootstrap_comparisons_diversity_inter_intra_plots.csv")
+out_selfing_csv <- file.path(out_dir, "final_selfing_comparisons.csv")
+out_sgs_csv <- file.path(out_dir, "bootstrap_b_log_comparisons.csv")
+
+# Bootstrap iterations
+n_iter <- 10000
+set.seed(123)
+
+# Indicators (diversity)
+indicators <- c("AR", "He", "Ho", "Fi")
+
+# Biological cohorts to keep for intra-plot filtering
+biological_cats <- c("SED", "INT", "ADL")
+
+# Plot aesthetics
+fill_colors <- c("TRUE" = "tomato", "FALSE" = "grey70")
+## ======================================================
+
+## ===================== LIBRARIES ======================
 library(dplyr)
 library(readr)
 library(purrr)
 library(stringr)
+library(tidyr)
 library(ggplot2)
+library(patchwork)
+## ======================================================
 
-# ------------------------------------------------------------------------------
-# 1. Load and combine input data
-# ------------------------------------------------------------------------------
+## ===================== CHECK INPUTS ===================
+stopifnot(file.exists(file_pai))
+stopifnot(file.exists(file_hko))
+stopifnot(file.exists(file_selfing))
+stopifnot(file.exists(file_sgs))
+## ======================================================
 
-# Define input file paths
-file_pai <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/Results/PAI74/results_PAI74_full_bootstrap.csv"
-file_hko <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/Results/HKO50/results_HKO50_full_bootstrap.csv"
+################################################################################
+########################## 1) BOOTSTRAP DIVERSITY ##############################
+################################################################################
 
-# Read data
 pai <- read_csv(file_pai, show_col_types = FALSE) %>% mutate(Plot = "PAI74")
 hko <- read_csv(file_hko, show_col_types = FALSE) %>% mutate(Plot = "HKO50")
-
-# Combine into one dataset
 data_all <- bind_rows(pai, hko)
 
-# ------------------------------------------------------------------------------
-# 2. Bootstrap function
-# ------------------------------------------------------------------------------
-
-bootstrap_diff <- function(df1, df2, var) {
+bootstrap_diff <- function(df1, df2, var, n_iter = 10000) {
   merged <- inner_join(
     df1 %>% select(Markers, value1 = !!sym(var)),
     df2 %>% select(Markers, value2 = !!sym(var)),
@@ -41,7 +84,7 @@ bootstrap_diff <- function(df1, df2, var) {
     return(data.frame(Obs_Diff = NA, CI_lower = NA, CI_upper = NA, Significant = NA))
   }
   
-  diffs_boot <- replicate(10000, mean(sample(merged$Diff, replace = TRUE)))
+  diffs_boot <- replicate(n_iter, mean(sample(merged$Diff, replace = TRUE)))
   ci <- quantile(diffs_boot, c(0.025, 0.975), na.rm = TRUE)
   obs_diff <- mean(merged$Diff)
   
@@ -53,12 +96,6 @@ bootstrap_diff <- function(df1, df2, var) {
   )
 }
 
-# ------------------------------------------------------------------------------
-# 3. Compute bootstrap comparisons
-# ------------------------------------------------------------------------------
-
-set.seed(123)
-indicators <- c("AR", "He", "Ho", "Fi")
 plots <- unique(data_all$Plot)
 categories <- unique(data_all$Category)
 results_list <- list()
@@ -69,7 +106,7 @@ for (cat in categories) {
     g1 <- data_all %>% filter(Plot == "HKO50", Category == cat)
     g2 <- data_all %>% filter(Plot == "PAI74", Category == cat)
     
-    res <- bootstrap_diff(g1, g2, var)
+    res <- bootstrap_diff(g1, g2, var, n_iter = n_iter)
     res$Comparison <- "PAI74 vs HKO50"
     res$Category <- cat
     res$Variable <- var
@@ -88,7 +125,7 @@ for (plot in plots) {
       g1 <- sub_data %>% filter(Category == pair[1])
       g2 <- sub_data %>% filter(Category == pair[2])
       
-      res <- bootstrap_diff(g1, g2, var)
+      res <- bootstrap_diff(g1, g2, var, n_iter = n_iter)
       res$Comparison <- paste0(plot, ": ", pair[2], " vs ", pair[1])
       res$Category <- paste(pair[1], "vs", pair[2])
       res$Variable <- var
@@ -98,22 +135,15 @@ for (plot in plots) {
   }
 }
 
-# Combine all results
-final_results <- bind_rows(results_list) %>%
+final_results_div <- bind_rows(results_list) %>%
   select(Type, Comparison, Category, Variable, Obs_Diff, CI_lower, CI_upper, Significant)
-
-# ------------------------------------------------------------------------------
-# 4. Filter biologically relevant comparisons
-# ------------------------------------------------------------------------------
-
-biological_cats <- c("SED", "INT", "ADL")
 
 valid_intra_biological <- function(category_string) {
   parts <- unlist(strsplit(category_string, " vs "))
   length(parts) == 2 && all(parts %in% biological_cats)
 }
 
-filtered_results <- final_results %>%
+filtered_results_div <- final_results_div %>%
   filter(
     Type == "Inter-plot" |
       (Type == "Intra-plot" & sapply(Category, valid_intra_biological))
@@ -127,121 +157,79 @@ filtered_results <- final_results %>%
     )
   )
 
-# Export results
-write.csv(
-  filtered_results,
-  "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrap_comparisons_inter_intra_plots.csv",
-  row.names = FALSE
-)
+write.csv(filtered_results_div, out_diversity_csv, row.names = FALSE)
+cat("Saved diversity bootstrap results:", out_diversity_csv, "\n")
 
-# ------------------------------------------------------------------------------
-# 5. Prepare data for plotting
-# ------------------------------------------------------------------------------
-
-# Split into 3 comparison types
-data_inter <- filtered_results %>% filter(ComparisonGroup == "HKO50 vs PAI74") %>%
-  mutate(Comparison_detail = paste(Category, "-", Comparison))
-data_pai <- filtered_results %>% filter(ComparisonGroup == "PAI74 only")
-data_hko <- filtered_results %>% filter(ComparisonGroup == "HKO50 only")
-
-# ------------------------------------------------------------------------------
-# 6. Plotting function
-# ------------------------------------------------------------------------------
-
+# ---- Plotting (diversity) ----
 plot_comparisons <- function(df, title_label, use_comparison_col = TRUE) {
   df$Variable <- factor(df$Variable, levels = c("AR", "He", "Ho", "Fi"))
   facet_var <- if (use_comparison_col) "Comparison_detail" else "Comparison"
   
-  ggplot(df, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
+  ggplot(df, aes(x = Variable, y = Obs_Diff, fill = as.character(Significant))) +
     geom_bar(stat = "identity", position = "dodge") +
     geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), width = 0.2) +
     facet_wrap(as.formula(paste("~", facet_var)), scales = "free_x", ncol = 2) +
-    scale_fill_manual(values = c("TRUE" = "tomato", "FALSE" = "grey70")) +
-    labs(
-      title = title_label,
-      y = "Observed Difference",
-      x = "Genetic Indicator"
-    ) +
+    scale_fill_manual(values = fill_colors, name = "Significant") +
+    labs(title = title_label, y = "Observed difference", x = "Genetic indicator") +
     theme_minimal(base_size = 13) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
-# ------------------------------------------------------------------------------
-# 7. Generate and display plots
-# ------------------------------------------------------------------------------
+data_inter <- filtered_results_div %>%
+  filter(ComparisonGroup == "HKO50 vs PAI74") %>%
+  mutate(Comparison_detail = paste(Category, "-", Comparison))
+
+data_pai <- filtered_results_div %>% filter(ComparisonGroup == "PAI74 only")
+data_hko <- filtered_results_div %>% filter(ComparisonGroup == "HKO50 only")
 
 plot1 <- plot_comparisons(data_inter, "PAI74 vs HKO50 comparisons", use_comparison_col = TRUE)
 plot2 <- plot_comparisons(data_pai, "Intra-plot comparisons in PAI74", use_comparison_col = FALSE)
 plot3 <- plot_comparisons(data_hko, "Intra-plot comparisons in HKO50", use_comparison_col = FALSE)
 
-print(plot1)
-print(plot2)
-print(plot3)
-
-
-
-
+ggsave(file.path(fig_dir, "bootstrap_diversity_interplot.png"), plot1, width = 10, height = 7, dpi = 300, bg = "white")
+ggsave(file.path(fig_dir, "bootstrap_diversity_intraplot_PAI74.png"), plot2, width = 10, height = 7, dpi = 300, bg = "white")
+ggsave(file.path(fig_dir, "bootstrap_diversity_intraplot_HKO50.png"), plot3, width = 10, height = 7, dpi = 300, bg = "white")
 
 ################################################################################
-######################## Bootstrap Analysis of selfing #########################
+########################## 2) BOOTSTRAP SELFING ###############################
 ################################################################################
 
-# Load required libraries
-library(dplyr)
-library(readr)
-library(tidyr)
+selfing_data <- read_csv(file_selfing, show_col_types = FALSE)
 
-# Set file path
-file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/Results/PAI74_HKO50/results_HKO50_PAI74_bootstrap_selfing.csv"
-
-# Read data
-selfing_data <- read_csv(file_path, show_col_types = FALSE)
-
-
+# Marker columns: everything except metadata columns
 marker_cols <- setdiff(names(selfing_data), c("Plot", "Population", "S(selfing rate)"))
-head(marker_cols)
-
 
 selfing_data <- selfing_data %>%
   mutate(Group = paste(Plot, Population, sep = "_"))
+
 groups <- unique(selfing_data$Group)
 group_comparisons <- combn(groups, 2, simplify = FALSE)
 
+results_selfing <- list()
 
-# Number of bootstrap iterations
-n_iter <- 10000
-set.seed(123)
-results <- list()
-
-# Loop over all pairwise group comparisons
 for (comp in group_comparisons) {
   g1 <- comp[1]
   g2 <- comp[2]
   
-  # Extract selfing data for each group
   m1 <- selfing_data %>% filter(Group == g1)
   m2 <- selfing_data %>% filter(Group == g2)
   
-  # Skip comparison if one group is missing or has multiple rows
-  if (nrow(m1) != 1 | nrow(m2) != 1) next
+  # Skip if one group is missing or has multiple rows
+  if (nrow(m1) != 1 || nrow(m2) != 1) next
   
-  # Perform bootstrap by resampling marker columns with replacement
   boot_diffs <- replicate(n_iter, {
     sampled_cols <- sample(marker_cols, length(marker_cols), replace = TRUE)
     mean(as.numeric(m2[1, sampled_cols]), na.rm = TRUE) -
       mean(as.numeric(m1[1, sampled_cols]), na.rm = TRUE)
   })
   
-  # Compute observed multilocus selfing difference
   obs_diff <- mean(as.numeric(m2[1, marker_cols]), na.rm = TRUE) -
     mean(as.numeric(m1[1, marker_cols]), na.rm = TRUE)
   
-  # Compute 95% confidence interval and test for significance
   ci <- quantile(boot_diffs, c(0.025, 0.975), na.rm = TRUE)
   significant <- !(0 >= ci[1] & 0 <= ci[2])
   
-  # Store results
-  results[[length(results) + 1]] <- data.frame(
+  results_selfing[[length(results_selfing) + 1]] <- data.frame(
     Group1 = g1,
     Group2 = g2,
     Obs_Diff = obs_diff,
@@ -251,70 +239,42 @@ for (comp in group_comparisons) {
   )
 }
 
-
-# Combine all results into a single dataframe
-final_results <- bind_rows(results)
-
-print(final_results)
-
-# Export results to CSV
-write.csv(
-  final_results,
-  "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/final_selfing_comparisons.csv",
-  row.names = FALSE
-)
-
+final_results_selfing <- bind_rows(results_selfing)
+write.csv(final_results_selfing, out_selfing_csv, row.names = FALSE)
+cat("Saved selfing bootstrap results:", out_selfing_csv, "\n")
 
 ################################################################################
-########################## Bootstrap Analysis of SGS ###########################
+########################## 3) BOOTSTRAP SGS (b-log) ############################
 ################################################################################
 
-library(dplyr)
-library(readr)
-
-# Load your CSV file
-file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/spagedie/Results/PAI74_HKO50/results_HKO50_PAI74_Sp_sign_btw_plot.csv"
-data <- read_csv(file_path, show_col_types = FALSE)
-
-# Create a unique group identifier
-data <- data %>%
+sgs_data <- read_csv(file_sgs, show_col_types = FALSE) %>%
   mutate(Group = paste(Plot, category, sep = "_"))
 
-# Get list of all unique group names
-groups <- unique(data$Group)
-group_comparisons <- combn(groups, 2, simplify = FALSE)
+groups_sgs <- unique(sgs_data$Group)
+group_comparisons_sgs <- combn(groups_sgs, 2, simplify = FALSE)
 
-# Initialize bootstrap parameters
-n_iter <- 10000
-set.seed(123)
-results <- list()
+results_sgs <- list()
 
-# Loop over all group comparisons
-for (comp in group_comparisons) {
+for (comp in group_comparisons_sgs) {
   g1 <- comp[1]
   g2 <- comp[2]
   
-  b1 <- data %>% filter(Group == g1) %>% pull(b_log)
-  b2 <- data %>% filter(Group == g2) %>% pull(b_log)
+  b1 <- sgs_data %>% filter(Group == g1) %>% pull(b_log)
+  b2 <- sgs_data %>% filter(Group == g2) %>% pull(b_log)
   
-  # Skip if one group is empty
-  if (length(b1) == 0 | length(b2) == 0) next
+  if (length(b1) == 0 || length(b2) == 0) next
   
-  # Compute observed difference
   obs_diff <- mean(b2, na.rm = TRUE) - mean(b1, na.rm = TRUE)
   
-  # Bootstrap
   boot_diffs <- replicate(n_iter, {
     mean(sample(b2, size = length(b2), replace = TRUE)) -
       mean(sample(b1, size = length(b1), replace = TRUE))
   })
   
-  # Confidence interval and significance
   ci <- quantile(boot_diffs, c(0.025, 0.975), na.rm = TRUE)
   significant <- !(0 >= ci[1] & 0 <= ci[2])
   
-  # Store result
-  results[[length(results) + 1]] <- data.frame(
+  results_sgs[[length(results_sgs) + 1]] <- data.frame(
     Group1 = g1,
     Group2 = g2,
     Obs_Diff = obs_diff,
@@ -324,201 +284,51 @@ for (comp in group_comparisons) {
   )
 }
 
-# Combine all results
-final_results <- bind_rows(results)
-
-# View results
-print(final_results)
-
-# Optional: export to CSV
-write.csv(
-  final_results,
-  "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrap_b_log_comparisons.csv",
-  row.names = FALSE
-)
-
+final_results_sgs <- bind_rows(results_sgs)
+write.csv(final_results_sgs, out_sgs_csv, row.names = FALSE)
+cat("Saved SGS bootstrap results:", out_sgs_csv, "\n")
 
 ################################################################################
-########################### Final plot visualization ###########################
+########################## 4) SYNTHETIC PANEL PLOT #############################
 ################################################################################
 
-# Load libraries
-library(readr)
-library(dplyr)
-library(ggplot2)
+# Merge diversity + SGS + selfing into one display table (optional)
+# Here we reload diversity CSV to keep workflow simple and reproducible
+df_main <- read_csv(out_diversity_csv, show_col_types = FALSE)
 
-# Load the CSV file
-file_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrapping/input_files/bootstrap_comparisons_inter_intra_plots.csv"
-df <- read_csv(file_path, show_col_types = FALSE)
-
-# Filter only comparisons between PAI74 and HKO50
-df_inter <- df %>%
-  filter(grepl("PAI74 vs HKO50", Comparison))
-
-df_inter <- df_inter %>%
+# (Optional) add percent scale for visual comparison
+df_main <- df_main %>%
   mutate(
-    Category = factor(Category, levels = c(
-      "All categories confounded", "SED", "INT", "ADL"
-    )),
-    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S"))
+    Percent_Diff = 100 * Obs_Diff / (abs(Obs_Diff) + abs(CI_upper) + 1e-6),
+    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi")),
+    Category = factor(Category)
   )
 
-# Plot PAI74 vs HKO50
-ggplot(df_inter, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
-  geom_col(position = "dodge", width = 0.7) +
-  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), width = 0.2) +
-  facet_wrap(~ Category, scales = "free_x") +
-  scale_fill_manual(values = c("TRUE" = "tomato", "FALSE" = "grey70")) +
-  labs(
-    title = "Differences between PAI74 and HKO50",
-    x = "Genetic indicator",
-    y = "Observed difference",
-    fill = "Significant"
-  ) +
-  theme_minimal(base_size = 13) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-
-# Plot PAI74 only by cohorts
-df_pai74 <- df %>%
-  filter(Type == "Intra-plot" & grepl("^PAI74", Comparison)) %>%
-  mutate(
-    Category = factor(Category, levels = c("SED vs INT", "SED vs ADL", "INT vs ADL")),
-    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S"))
-  )
-
-
-ggplot(df_pai74, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
-  geom_col(position = "dodge", width = 0.7) +
-  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), width = 0.2) +
-  facet_wrap(~ Category, scales = "free_x") +
-  scale_fill_manual(values = c("TRUE" = "tomato", "FALSE" = "grey70")) +
-  labs(
-    title = "Intra-plot comparisons within PAI74",
-    x = "Genetic indicator",
-    y = "Observed difference",
-    fill = "Significant"
-  ) +
-  theme_minimal(base_size = 13) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-# Plot HKO50 only by cohorts
-df_hko50 <- df %>%
-  filter(Type == "Intra-plot" & grepl("^HKO50", Comparison)) %>%
-  mutate(
-    Category = factor(Category, levels = c("SED vs INT", "SED vs ADL", "INT vs ADL")),
-    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S"))
-  )
-
-
-ggplot(df_hko50, aes(x = Variable, y = Obs_Diff, fill = Significant)) +
-  geom_col(position = "dodge", width = 0.7) +
-  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), width = 0.2) +
-  facet_wrap(~ Category, scales = "free_x") +
-  scale_fill_manual(values = c("TRUE" = "tomato", "FALSE" = "grey70")) +
-  labs(
-    title = "Intra-plot comparisons within HKO50",
-    x = "Genetic indicator",
-    y = "Observed difference",
-    fill = "Significant"
-  ) +
-  theme_minimal(base_size = 13) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-
-
-################################################################################
-########################### Synthetic Panel Plot ###############################
-################################################################################
-
-# Load libraries
-library(readr)
-library(dplyr)
-library(stringr)
-library(ggplot2)
-library(patchwork)
-
-# --------------------------- 0) Helper function ------------------------------
-# Common plotting function: percent-scale, red (signif) vs grey (ns), no CI
-plot_comparison <- function(data, title_label) {
-  ggplot(data, aes(x = Variable, y = Percent_Diff, fill = Significant)) +
+plot_percent <- function(data, title_label) {
+  ggplot(data, aes(x = Variable, y = Percent_Diff, fill = as.character(Significant))) +
     geom_col(width = 0.7) +
     facet_wrap(~ Category, scales = "free_x") +
     scale_fill_manual(
-      values = c("TRUE" = "tomato", "FALSE" = "grey70"),
-      labels = c("TRUE" = "Significant", "FALSE" = "Not significant")
+      values = fill_colors,
+      labels = c("TRUE" = "Significant", "FALSE" = "Not significant"),
+      name = "Significance"
     ) +
     labs(
       title = title_label,
       x = "Genetic indicator",
-      y = "Observed difference (%)",
-      fill = "Significance"
+      y = "Observed difference (%)"
     ) +
     theme_minimal(base_size = 13) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
-# --------------------------- 1) Load main CSV --------------------------------
-file_main <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrapping/input_files/bootstrap_comparisons_inter_intra_plots.csv"
-df <- read_csv(file_main, show_col_types = FALSE)
+df_pai74 <- df_main %>% filter(Type == "Intra-plot" & str_starts(Comparison, "PAI74"))
+df_hko50 <- df_main %>% filter(Type == "Intra-plot" & str_starts(Comparison, "HKO50"))
 
-# --- 1. Add % difference (visual scale) & tidy factors ---
-# NOTE: Percent_Diff is a visual normalization since true reference means
-# are not provided for every comparison. We do NOT draw CIs in percent plots.
-df <- df %>%
-  mutate(
-    Percent_Diff = 100 * Obs_Diff / (abs(Obs_Diff) + abs(CI_upper) + 1e-6),
-    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S")),
-    Category = factor(
-      Category,
-      levels = c("All categories confounded", "JUV", "INT", "ADL",
-                 "JUV vs INT", "JUV vs ADL", "INT vs ADL")
-    )
-  )
+plot2p <- plot_percent(df_pai74, "Intra-plot comparisons within PAI74")
+plot3p <- plot_percent(df_hko50, "Intra-plot comparisons within HKO50")
 
-# --------------------------- 2) Subsets & plots (main) ------------------------
-df_inter <- df %>% filter(grepl("PAI74 vs HKO50", Comparison))
-df_pai74 <- df %>% filter(Type == "Intra-plot" & str_starts(Comparison, "PAI74"))
-df_hko50 <- df %>% filter(Type == "Intra-plot" & str_starts(Comparison, "HKO50"))
+final_panel <- plot2p / plot3p
+ggsave(file.path(fig_dir, "bootstrap_synthetic_panel.png"), final_panel, width = 12, height = 10, dpi = 300, bg = "white")
 
-plot1 <- plot_comparison(df_inter, "PAI74 vs HKO50")
-plot2 <- plot_comparison(df_pai74, "Intra-plot comparisons within PAI74")
-plot3 <- plot_comparison(df_hko50, "Intra-plot comparisons within HKO50")
-
-final_plot <- plot2 / plot3
-print(final_plot)
-
-
-# --------------------------- 3) Load extra CSV for plot4 ----------------------
-file_extra <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/03-diversity_and_SGS_analysis/bootstrapping/results/results_boostrapping_PAI74_ADL_log_unlog.csv"
-df_extra <- read_csv(file_extra, show_col_types = FALSE)
-
-# Ensure required columns exist (minimally: Comparison, Category, Variable, Obs_Diff, Significant)
-required_cols <- c("Comparison","Category","Variable","Obs_Diff","Significant")
-missing_req <- setdiff(required_cols, names(df_extra))
-if (length(missing_req) > 0) {
-  stop(paste0("The extra CSV is missing required columns: ", paste(missing_req, collapse = ", ")))
-}
-
-# Optional CI columns; create if missing (not plotted but used in scale formula)
-if (!"CI_upper" %in% names(df_extra)) df_extra$CI_upper <- 0
-
-# Prepare percent view and factors for plot4
-df_extra <- df_extra %>%
-  mutate(
-    Percent_Diff = 100 * Obs_Diff / (abs(Obs_Diff) + abs(CI_upper) + 1e-6),
-    Variable = factor(Variable, levels = c("AR", "He", "Ho", "Fi", "Sp", "S")),
-    # If Category not already explicit, set a sensible label:
-    Category = ifelse(is.na(Category) | Category == "",
-                      "ADL (logged vs unlogged)", Category),
-    Category = factor(Category)
-  )
-
-plot4 <- plot_comparison(df_extra, "PAI74 ADL: logged vs unlogged")
-
-
-
-
-
-
-
+cat("Saved synthetic panel:", file.path(fig_dir, "bootstrap_synthetic_panel.png"), "\n")
