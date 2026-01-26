@@ -1476,4 +1476,4 @@ lm_fathers_distance  <- lm(mean_distance ~ DBH_Father * Plot_Father, data = fath
 summary(lm_mothers_offspring)
 summary(lm_mothers_distance)
 summary(lm_fathers_offspring)
-summary(lm_fathers_distance)
+summary(lm_fathers_distance) 
