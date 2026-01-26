@@ -67,11 +67,6 @@ cat("Final dataframe exported to:", output_path, "\n")
 ###########################################################################################
 
 
-
-########################################################################
-######################### 2 plots map - visualization ##################
-########################################################################
-
 ########################################################################
 ######################### 2 plots map - visualization ##################
 ########################################################################
@@ -325,6 +320,98 @@ readr::write_csv(seed_matrix, file.path(out_dir, "seed_direction_matrix.csv"))
 readr::write_csv(pollen_matrix, file.path(out_dir, "pollen_direction_matrix.csv"))
 
 
+########################################################################
+########## Dispersal counts within vs between plots (post-logging) #####
+########################################################################
+
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidyr)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+out_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ IDs to exclude (logged individuals) ------------------
+excluded_ids <- c(
+  "AM93","AM95","AN06","AN32","AN40","AN41","AN42","AN58","AN63",
+  "AN68","AN74","AN75","AN78","AN84","AN87","AN92","AO01","AO12",
+  "AP04","AP07","AP10","AP13","AP18","AP22","AP23","AP27","AP41",
+  "AP42","AQ08","AQ09","AQ12","AQ14","AQ29","AQ30","AQ34","AQ52",
+  "AQ71","AQ74","AQ75","AS29","AS45","AS61"
+)
+
+# ------------------ Create PAI74_post_logging ------------------
+df_map_post <- df_map %>%
+  mutate(
+    Plot_Mother = if_else(Plot_Mother == "PAI74" & !Mother_ID %in% excluded_ids,
+                          "PAI74_post_logging", Plot_Mother),
+    Plot_Father = if_else(Plot_Father == "PAI74" & !Father_ID %in% excluded_ids,
+                          "PAI74_post_logging", Plot_Father),
+    Plot_Offspring = if_else(Plot_Offspring == "PAI74" &
+                               (!Mother_ID %in% excluded_ids & !Father_ID %in% excluded_ids),
+                             "PAI74_post_logging", Plot_Offspring)
+  )
+
+# ---- 1) Basic sanity: keep rows with available plot info for parents ----
+df_seed   <- df_map_post %>% filter(!is.na(Plot_Mother), !is.na(Plot_Offspring))
+df_pollen <- df_map_post %>% filter(!is.na(Plot_Father), !is.na(Plot_Offspring))
+
+# ---- 2) SEED dispersal: mother (source) -> offspring (destination) ----
+seed_counts_post <- df_seed %>%
+  mutate(
+    flow_type = if_else(Plot_Mother == Plot_Offspring, "within_plot", "between_plots"),
+    direction = paste0(Plot_Mother, " → ", Plot_Offspring)
+  ) %>%
+  count(flow_type, direction, name = "n") %>%
+  arrange(flow_type, desc(n))
+
+# ---- 3) POLLEN dispersal: father (source) -> offspring (destination) ----
+pollen_counts_post <- df_pollen %>%
+  mutate(
+    flow_type = if_else(Plot_Father == Plot_Offspring, "within_plot", "between_plots"),
+    direction = paste0(Plot_Father, " → ", Plot_Offspring)
+  ) %>%
+  count(flow_type, direction, name = "n") %>%
+  arrange(flow_type, desc(n))
+
+# ---- 4) Directional matrices (HKO50 vs PAI74_post_logging) ----
+seed_matrix_post <- df_seed %>%
+  count(Plot_Mother, Plot_Offspring, name = "n") %>%
+  pivot_wider(names_from = Plot_Offspring, values_from = n, values_fill = 0) %>%
+  arrange(Plot_Mother)
+
+pollen_matrix_post <- df_pollen %>%
+  count(Plot_Father, Plot_Offspring, name = "n") %>%
+  pivot_wider(names_from = Plot_Offspring, values_from = n, values_fill = 0) %>%
+  arrange(Plot_Father)
+
+# ---- 5) Print quick summaries to console ----
+cat("\n=== SEED dispersal (mother → offspring, post-logging) ===\n")
+print(seed_counts_post)
+
+cat("\n=== POLLEN dispersal (father → offspring, post-logging) ===\n")
+print(pollen_counts_post)
+
+cat("\n=== Directional matrices (post-logging) ===\n")
+cat("\n[SEED] rows = Mother plot, cols = Offspring plot\n")
+print(seed_matrix_post)
+cat("\n[POLLEN] rows = Father plot, cols = Offspring plot\n")
+print(pollen_matrix_post)
+
+# ---- 6) Export summaries to CSV ----
+write_csv(seed_counts_post, file.path(out_dir, "seed_counts_direction_post.csv"))
+write_csv(pollen_counts_post, file.path(out_dir, "pollen_counts_direction_post.csv"))
+write_csv(seed_matrix_post, file.path(out_dir, "seed_direction_matrix_post.csv"))
+write_csv(pollen_matrix_post, file.path(out_dir, "pollen_direction_matrix_post.csv"))
+
+
+
+
+
 
 ########################################################################
 ############ Parental reproductive success & dispersal distances #######
@@ -502,6 +589,177 @@ print(p_combined_box)
 
 
 ########################################################################
+############ Parental reproductive success & dispersal distances #######
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ IDs to exclude (logged individuals) ------------------
+excluded_ids <- c(
+  "AM93","AM95","AN06","AN32","AN40","AN41","AN42","AN58","AN63",
+  "AN68","AN74","AN75","AN78","AN84","AN87","AN92","AO01","AO12",
+  "AP04","AP07","AP10","AP13","AP18","AP22","AP23","AP27","AP41",
+  "AP42","AQ08","AQ09","AQ12","AQ14","AQ29","AQ30","AQ34","AQ52",
+  "AQ71","AQ74","AQ75","AS29","AS45","AS61"
+)
+
+# ------------------ Create PAI74_post_logging ------------------
+df_map_post <- df_map %>%
+  mutate(
+    Plot_Mother = if_else(Plot_Mother == "PAI74" & !Mother_ID %in% excluded_ids,
+                          "PAI74_post_logging", Plot_Mother),
+    Plot_Father = if_else(Plot_Father == "PAI74" & !Father_ID %in% excluded_ids,
+                          "PAI74_post_logging", Plot_Father)
+  )
+
+# ------------------ SEED (mothers) ------------------
+mother_summary <- df_map_post %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID) %>%
+  summarise(
+    n_offspring = n(),
+    mean_distance = mean(Distance_To_Mother, na.rm = TRUE),
+    median_distance = median(Distance_To_Mother, na.rm = TRUE),
+    max_distance = max(Distance_To_Mother, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# ------------------ POLLEN (fathers) ------------------
+father_summary <- df_map_post %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
+  group_by(Plot_Father, Father_ID) %>%
+  summarise(
+    n_offspring = n(),
+    mean_distance = mean(Distance_To_Father, na.rm = TRUE),
+    median_distance = median(Distance_To_Father, na.rm = TRUE),
+    max_distance = max(Distance_To_Father, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# ------------------ EXPORT ------------------
+write_csv(mother_summary, file.path(output_dir, "mother_reproductive_success_post.csv"))
+write_csv(father_summary, file.path(output_dir, "father_reproductive_success_post.csv"))
+
+# ------------------ Colors ------------------
+plot_colors <- c("HKO50" = "#CDAD00",
+                 "PAI74" = "mediumorchid4",
+                 "PAI74_post_logging" = "#CD96CD")
+
+# ------------------ Visualisation: number of offspring ------------------
+p1 <- ggplot(mother_summary, aes(x = Plot_Mother, y = n_offspring, fill = Plot_Mother)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = plot_colors) +
+  theme_minimal() +
+  labs(title = "Number of offspring per mother", x = "Plot", y = "Offspring count")
+
+p2 <- ggplot(father_summary, aes(x = Plot_Father, y = n_offspring, fill = Plot_Father)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = plot_colors) +
+  theme_minimal() +
+  labs(title = "Number of offspring per father", x = "Plot", y = "Offspring count")
+
+# ------------------ Visualisation: mean dispersal distances ------------------
+p3 <- ggplot(mother_summary, aes(x = Plot_Mother, y = mean_distance, fill = Plot_Mother)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = plot_colors) +
+  theme_minimal() +
+  labs(title = "Mean seed dispersal distance per mother", x = "Plot", y = "Distance (m)")
+
+p4 <- ggplot(father_summary, aes(x = Plot_Father, y = mean_distance, fill = Plot_Father)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = plot_colors) +
+  theme_minimal() +
+  labs(title = "Mean pollen dispersal distance per father", x = "Plot", y = "Distance (m)")
+
+# ------------------ Density plots ------------------
+p5 <- ggplot(df_map_post, aes(x = Distance_To_Mother, fill = Plot_Mother, color = Plot_Mother)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_manual(values = plot_colors) +
+  scale_color_manual(values = plot_colors) +
+  scale_x_continuous(limits = c(0, 2000)) +
+  theme_minimal() +
+  labs(title = "Distribution of seed dispersal distances", x = "Distance (m)", y = "Density")
+
+p6 <- ggplot(df_map_post, aes(x = Distance_To_Father, fill = Plot_Father, color = Plot_Father)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_manual(values = plot_colors) +
+  scale_color_manual(values = plot_colors) +
+  scale_x_continuous(limits = c(0, 2000)) +
+  theme_minimal() +
+  labs(title = "Distribution of pollen dispersal distances", x = "Distance (m)", y = "Density")
+
+# ------------------ Wilcoxon tests ------------------
+wilcox_mother_offspring <- wilcox.test(n_offspring ~ Plot_Mother, data = mother_summary %>% filter(Plot_Mother != "PAI74_post_logging"))
+wilcox_father_offspring <- wilcox.test(n_offspring ~ Plot_Father, data = father_summary %>% filter(Plot_Father != "PAI74_post_logging"))
+wilcox_mother_distance  <- wilcox.test(mean_distance ~ Plot_Mother, data = mother_summary %>% filter(Plot_Mother != "PAI74_post_logging"))
+wilcox_father_distance  <- wilcox.test(mean_distance ~ Plot_Father, data = father_summary %>% filter(Plot_Father != "PAI74_post_logging"))
+
+cat("\n[Wilcoxon] Mothers offspring HKO50 vs PAI74:\n"); print(wilcox_mother_offspring)
+cat("\n[Wilcoxon] Fathers offspring HKO50 vs PAI74:\n"); print(wilcox_father_offspring)
+cat("\n[Wilcoxon] Mothers distance HKO50 vs PAI74:\n"); print(wilcox_mother_distance)
+cat("\n[Wilcoxon] Fathers distance HKO50 vs PAI74:\n"); print(wilcox_father_distance)
+
+# ------------------ Combined plot (Seed vs Pollen) ------------------
+df_long <- df_map_post %>%
+  select(Plot_Offspring, Plot_Mother, Distance_To_Mother,
+         Plot_Father, Distance_To_Father) %>%
+  pivot_longer(
+    cols = c(Distance_To_Mother, Distance_To_Father),
+    names_to = "type", values_to = "distance"
+  ) %>%
+  mutate(
+    type = ifelse(type == "Distance_To_Mother", "Seed", "Pollen"),
+    plot = ifelse(type == "Seed", Plot_Mother, Plot_Father)
+  ) %>%
+  filter(!is.na(distance), !is.na(plot))
+
+p_combined_box <- ggplot(df_long, aes(x = type, y = distance, fill = type)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ plot, ncol = 2) +
+  scale_fill_manual(values = c("Seed" = "tan1", "Pollen" = "#F0E68C")) +
+  scale_y_continuous(limits = c(0, 2000)) +
+  theme_minimal() +
+  labs(title = "Seed vs Pollen dispersal distances per plot",
+       x = "Dispersal type", y = "Distance (m)")
+
+print(p_combined_box)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+########################################################################
 ########## Barplots of reproductive success per parent #################
 ########################################################################
 
@@ -517,7 +775,11 @@ output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Loggi
 df_map <- read_csv(path_dfmap, show_col_types = FALSE)
 
 # ------------------ Custom plot colors ------------------
-plot_colors <- c("HKO50" = "#CDAD00", "PAI74" = "mediumorchid4")
+plot_colors <- c(
+  "HKO50" = "#CDAD00",           
+  "PAI74" = "mediumorchid4",     
+  "PAI74_post_logging" = "#CD96CD"  
+)
 
 # ------------------ Summaries ------------------
 mother_summary <- df_map %>%
@@ -598,55 +860,43 @@ ggsave(file.path(output_dir, "barplot_mothers_PAI74.png"), p_mother_pai74, width
 ggsave(file.path(output_dir, "barplot_fathers_HKO50.png"), p_father_hko50, width = 11, height = 7, dpi = 300, bg = "white")
 ggsave(file.path(output_dir, "barplot_fathers_PAI74.png"), p_father_pai74, width = 11, height = 7, dpi = 300, bg = "white")
 
-
-
-
-
 ########################################################################
-########## Gini index of reproductive success (inequality) #############
+########## Barplots with exclusion of logged individuals ###############
 ########################################################################
 
-library(readr)
-library(dplyr)
-library(ggplot2)
-library(ineq)  # for Gini index
+# Liste des parents exploités (à exclure)
+excluded_ids <- c(
+  "AM93","AM95","AN06","AN32","AN40","AN41","AN42","AN58","AN63",
+  "AN68","AN74","AN75","AN78","AN84","AN87","AN92","AO01","AO12",
+  "AP04","AP07","AP10","AP13","AP18","AP22","AP23","AP27","AP41",
+  "AP42","AQ08","AQ09","AQ12","AQ14","AQ29","AQ30","AQ34","AQ52",
+  "AQ71","AQ74","AQ75","AS29","AS45","AS61"
+)
 
-# ------------------ Paths ------------------
-path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
-output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+# Mothers PAI74 post-logging (excluant les IDs exploités)
+p_mother_pai74_post_logging <- plot_bar(
+  mother_summary %>% 
+    filter(Plot_Mother == "PAI74", !Mother_ID %in% excluded_ids) %>%
+    mutate(Plot_Mother = "PAI74_post_logging"),
+  id_col = "Mother_ID", plot_col = "Plot_Mother",
+  title = "Top 25 mothers - PAI74 (post-logging)"
+)
 
-# ------------------ Read ------------------
-df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+# Fathers PAI74 post-logging (excluant les IDs exploités)
+p_father_pai74_post_logging <- plot_bar(
+  father_summary %>% 
+    filter(Plot_Father == "PAI74", !Father_ID %in% excluded_ids) %>%
+    mutate(Plot_Father = "PAI74_post_logging"),
+  id_col = "Father_ID", plot_col = "Plot_Father",
+  title = "Top 25 fathers - PAI74 (post-logging)"
+)
 
-# ------------------ Summaries ------------------
-# Mothers
-mother_summary <- df_map %>%
-  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
-  group_by(Plot_Mother, Mother_ID) %>%
-  summarise(n_offspring = n(), .groups = "drop")
+# ------------------ Save plots ------------------
+ggsave(file.path(output_dir, "barplot_mothers_PAI74_post_logging.png"), 
+       p_mother_pai74_post_logging, width = 11, height = 7, dpi = 300, bg = "white")
 
-# Fathers
-father_summary <- df_map %>%
-  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
-  group_by(Plot_Father, Father_ID) %>%
-  summarise(n_offspring = n(), .groups = "drop")
-
-# ------------------ Compute Gini index ------------------
-# Mothers
-gini_mothers <- mother_summary %>%
-  group_by(Plot_Mother) %>%
-  summarise(Gini = Gini(n_offspring), .groups = "drop") %>%
-  mutate(Group = paste0("Mothers_", Plot_Mother))
-
-# Fathers
-gini_fathers <- father_summary %>%
-  group_by(Plot_Father) %>%
-  summarise(Gini = Gini(n_offspring), .groups = "drop") %>%
-  mutate(Group = paste0("Fathers_", Plot_Father))
-
-# Combine
-gini_results <- bind_rows(gini_mothers %>% rename(Plot = Plot_Mother),
-                          gini_fathers %>% rename(Plot = Plot_Father))
+ggsave(file.path(output_dir, "barplot_fathers_PAI74_post_logging.png"), 
+       p_father_pai74_post_logging, width = 11, height = 7, dpi = 300, bg = "white")
 
 
 
@@ -654,7 +904,7 @@ gini_results <- bind_rows(gini_mothers %>% rename(Plot = Plot_Mother),
 
 
 ########################################################################
-############## Lorenz curves for reproductive success ##################
+############## Gini index with exclusion of logged inds ################
 ########################################################################
 
 library(readr)
@@ -669,18 +919,119 @@ output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Loggi
 # ------------------ Read ------------------
 df_map <- read_csv(path_dfmap, show_col_types = FALSE)
 
+# ------------------ IDs to exclude (logged individuals) ------------------
+excluded_ids <- c(
+  "AM93","AM95","AN06","AN32","AN40","AN41","AN42","AN58","AN63",
+  "AN68","AN74","AN75","AN78","AN84","AN87","AN92","AO01","AO12",
+  "AP04","AP07","AP10","AP13","AP18","AP22","AP23","AP27","AP41",
+  "AP42","AQ08","AQ09","AQ12","AQ14","AQ29","AQ30","AQ34","AQ52",
+  "AQ71","AQ74","AQ75","AS29","AS45","AS61"
+)
+
 # ------------------ Summaries ------------------
-# Mothers
+# Mothers full
 mother_summary <- df_map %>%
   filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
   group_by(Plot_Mother, Mother_ID) %>%
   summarise(n_offspring = n(), .groups = "drop")
 
-# Fathers
+# Fathers full
 father_summary <- df_map %>%
   filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
   group_by(Plot_Father, Father_ID) %>%
   summarise(n_offspring = n(), .groups = "drop")
+
+# ------------------ Create PAI74_post_logging subsets ------------------
+mother_summary_post <- mother_summary %>%
+  filter(Plot_Mother == "PAI74", !Mother_ID %in% excluded_ids) %>%
+  mutate(Plot_Mother = "PAI74_post_logging")
+
+father_summary_post <- father_summary %>%
+  filter(Plot_Father == "PAI74", !Father_ID %in% excluded_ids) %>%
+  mutate(Plot_Father = "PAI74_post_logging")
+
+# ------------------ Combine full + post_logging ------------------
+mother_summary_all <- bind_rows(mother_summary, mother_summary_post)
+father_summary_all <- bind_rows(father_summary, father_summary_post)
+
+# ------------------ Compute Gini index ------------------
+# Mothers
+gini_mothers <- mother_summary_all %>%
+  group_by(Plot_Mother) %>%
+  summarise(Gini = Gini(n_offspring), .groups = "drop") %>%
+  mutate(Group = paste0("Mothers_", Plot_Mother))
+
+# Fathers
+gini_fathers <- father_summary_all %>%
+  group_by(Plot_Father) %>%
+  summarise(Gini = Gini(n_offspring), .groups = "drop") %>%
+  mutate(Group = paste0("Fathers_", Plot_Father))
+
+# Combine
+gini_results <- bind_rows(
+  gini_mothers %>% rename(Plot = Plot_Mother),
+  gini_fathers %>% rename(Plot = Plot_Father)
+)
+
+# ------------------ Save results ------------------
+write.csv(gini_results, file.path(output_dir, "gini_results_with_post_logging.csv"), row.names = FALSE)
+
+print(gini_results)
+
+
+
+
+
+########################################################################
+############## Lorenz curves with exclusion of logged inds #############
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ineq)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+
+# ------------------ Read ------------------
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ IDs to exclude (logged individuals) ------------------
+excluded_ids <- c(
+  "AM93","AM95","AN06","AN32","AN40","AN41","AN42","AN58","AN63",
+  "AN68","AN74","AN75","AN78","AN84","AN87","AN92","AO01","AO12",
+  "AP04","AP07","AP10","AP13","AP18","AP22","AP23","AP27","AP41",
+  "AP42","AQ08","AQ09","AQ12","AQ14","AQ29","AQ30","AQ34","AQ52",
+  "AQ71","AQ74","AQ75","AS29","AS45","AS61"
+)
+
+# ------------------ Summaries ------------------
+# Mothers full
+mother_summary <- df_map %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# Fathers full
+father_summary <- df_map %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
+  group_by(Plot_Father, Father_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# ------------------ Create PAI74_post_logging subsets ------------------
+mother_summary_post <- mother_summary %>%
+  filter(Plot_Mother == "PAI74", !Mother_ID %in% excluded_ids) %>%
+  mutate(Plot_Mother = "PAI74_post_logging")
+
+father_summary_post <- father_summary %>%
+  filter(Plot_Father == "PAI74", !Father_ID %in% excluded_ids) %>%
+  mutate(Plot_Father = "PAI74_post_logging")
+
+# ------------------ Combine full + post_logging ------------------
+mother_summary_all <- bind_rows(mother_summary, mother_summary_post)
+father_summary_all <- bind_rows(father_summary, father_summary_post)
 
 # ------------------ Lorenz function ------------------
 compute_lorenz_df <- function(data, plot_name, group) {
@@ -695,14 +1046,20 @@ compute_lorenz_df <- function(data, plot_name, group) {
 
 # Compute Lorenz curves
 lorenz_data <- bind_rows(
-  compute_lorenz_df(mother_summary %>% filter(Plot_Mother == "HKO50"), "HKO50", "Mothers"),
-  compute_lorenz_df(mother_summary %>% filter(Plot_Mother == "PAI74"), "PAI74", "Mothers"),
-  compute_lorenz_df(father_summary %>% filter(Plot_Father == "HKO50"), "HKO50", "Fathers"),
-  compute_lorenz_df(father_summary %>% filter(Plot_Father == "PAI74"), "PAI74", "Fathers")
+  compute_lorenz_df(mother_summary_all %>% filter(Plot_Mother == "HKO50"), "HKO50", "Mothers"),
+  compute_lorenz_df(mother_summary_all %>% filter(Plot_Mother == "PAI74"), "PAI74", "Mothers"),
+  compute_lorenz_df(mother_summary_all %>% filter(Plot_Mother == "PAI74_post_logging"), "PAI74_post_logging", "Mothers"),
+  compute_lorenz_df(father_summary_all %>% filter(Plot_Father == "HKO50"), "HKO50", "Fathers"),
+  compute_lorenz_df(father_summary_all %>% filter(Plot_Father == "PAI74"), "PAI74", "Fathers"),
+  compute_lorenz_df(father_summary_all %>% filter(Plot_Father == "PAI74_post_logging"), "PAI74_post_logging", "Fathers")
 )
 
 # ------------------ Colors for plots ------------------
-plot_colors <- c("HKO50" = "#CDAD00", "PAI74" = "mediumorchid4")
+plot_colors <- c(
+  "HKO50" = "#CDAD00",
+  "PAI74" = "mediumorchid4",
+  "PAI74_post_logging" = "#CD96CD"   # nouvelle couleur
+)
 
 # ------------------ Plot Lorenz curves ------------------
 p_lorenz <- ggplot(lorenz_data, aes(x = p, y = L, color = Plot, linetype = Group)) +
@@ -727,7 +1084,9 @@ p_lorenz <- ggplot(lorenz_data, aes(x = p, y = L, color = Plot, linetype = Group
 print(p_lorenz)
 
 # ------------------ Save ------------------
-ggsave(file.path(output_dir, "lorenz_curves.png"), p_lorenz, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave(file.path(output_dir, "lorenz_curves_with_post_logging.png"),
+       p_lorenz, width = 8, height = 6, dpi = 300, bg = "white")
+
 
 
 
@@ -803,6 +1162,111 @@ print(results)
 cat("\nP-value mothers (HKO50 vs PAI74):", pval_mothers, "\n")
 cat("P-value fathers (HKO50 vs PAI74):", pval_fathers, "\n")
 
+
+
+
+
+########################################################################
+############ Bootstrap test for differences in Gini index ##############
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ineq)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+
+# ------------------ Read ------------------
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ IDs to exclude (logged individuals) ------------------
+excluded_ids <- c(
+  "AM93","AM95","AN06","AN32","AN40","AN41","AN42","AN58","AN63",
+  "AN68","AN74","AN75","AN78","AN84","AN87","AN92","AO01","AO12",
+  "AP04","AP07","AP10","AP13","AP18","AP22","AP23","AP27","AP41",
+  "AP42","AQ08","AQ09","AQ12","AQ14","AQ29","AQ30","AQ34","AQ52",
+  "AQ71","AQ74","AQ75","AS29","AS45","AS61"
+)
+
+# ------------------ Summaries ------------------
+# Mothers
+mother_summary <- df_map %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# Fathers
+father_summary <- df_map %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father)) %>%
+  group_by(Plot_Father, Father_ID) %>%
+  summarise(n_offspring = n(), .groups = "drop")
+
+# ------------------ Create PAI74_post_logging subsets ------------------
+mother_summary_post <- mother_summary %>%
+  filter(Plot_Mother == "PAI74", !Mother_ID %in% excluded_ids) %>%
+  mutate(Plot_Mother = "PAI74_post_logging")
+
+father_summary_post <- father_summary %>%
+  filter(Plot_Father == "PAI74", !Father_ID %in% excluded_ids) %>%
+  mutate(Plot_Father = "PAI74_post_logging")
+
+# Combine
+mother_summary_all <- bind_rows(mother_summary, mother_summary_post)
+father_summary_all <- bind_rows(father_summary, father_summary_post)
+
+# ------------------ Bootstrap function ------------------
+bootstrap_gini <- function(values, n_iter = 1000) {
+  replicate(n_iter, {
+    resample <- sample(values, replace = TRUE)
+    Gini(resample)
+  })
+}
+
+# ------------------ Run bootstrap ------------------
+set.seed(123)
+
+# Mothers
+gini_mothers_HKO50  <- bootstrap_gini(mother_summary_all %>% filter(Plot_Mother == "HKO50") %>% pull(n_offspring))
+gini_mothers_PAI74  <- bootstrap_gini(mother_summary_all %>% filter(Plot_Mother == "PAI74") %>% pull(n_offspring))
+gini_mothers_PAI74p <- bootstrap_gini(mother_summary_all %>% filter(Plot_Mother == "PAI74_post_logging") %>% pull(n_offspring))
+
+# Fathers
+gini_fathers_HKO50  <- bootstrap_gini(father_summary_all %>% filter(Plot_Father == "HKO50") %>% pull(n_offspring))
+gini_fathers_PAI74  <- bootstrap_gini(father_summary_all %>% filter(Plot_Father == "PAI74") %>% pull(n_offspring))
+gini_fathers_PAI74p <- bootstrap_gini(father_summary_all %>% filter(Plot_Father == "PAI74_post_logging") %>% pull(n_offspring))
+
+# ------------------ Compare distributions ------------------
+pval_mothers_HKO50_PAI74  <- mean((gini_mothers_HKO50 - gini_mothers_PAI74) <= 0) * 2
+pval_mothers_HKO50_PAI74p <- mean((gini_mothers_HKO50 - gini_mothers_PAI74p) <= 0) * 2
+pval_mothers_PAI74_vs_post <- mean((gini_mothers_PAI74 - gini_mothers_PAI74p) <= 0) * 2
+
+pval_fathers_HKO50_PAI74  <- mean((gini_fathers_HKO50 - gini_fathers_PAI74) <= 0) * 2
+pval_fathers_HKO50_PAI74p <- mean((gini_fathers_HKO50 - gini_fathers_PAI74p) <= 0) * 2
+pval_fathers_PAI74_vs_post <- mean((gini_fathers_PAI74 - gini_fathers_PAI74p) <= 0) * 2
+
+# ------------------ Summary ------------------
+results <- data.frame(
+  Group = c("Mothers HKO50", "Mothers PAI74", "Mothers PAI74_post_logging",
+            "Fathers HKO50", "Fathers PAI74", "Fathers PAI74_post_logging"),
+  Mean_Gini = c(mean(gini_mothers_HKO50), mean(gini_mothers_PAI74), mean(gini_mothers_PAI74p),
+                mean(gini_fathers_HKO50), mean(gini_fathers_PAI74), mean(gini_fathers_PAI74p)),
+  SD_Gini = c(sd(gini_mothers_HKO50), sd(gini_mothers_PAI74), sd(gini_mothers_PAI74p),
+              sd(gini_fathers_HKO50), sd(gini_fathers_PAI74), sd(gini_fathers_PAI74p))
+)
+
+cat("\nBootstrap comparison of Gini index:\n")
+print(results)
+
+cat("\nP-values mothers:\n")
+cat("HKO50 vs PAI74:", pval_mothers_HKO50_PAI74, "\n")
+cat("HKO50 vs PAI74_post_logging:", pval_mothers_HKO50_PAI74p, "\n")
+cat("PAI74 vs PAI74_post_logging:", pval_mothers_PAI74_vs_post, "\n")
+
+cat("\nP-values fathers:\n")
+cat("HKO50 vs PAI74:", pval_fathers_HKO50_PAI74, "\n")
+cat("HKO50 vs PAI74_post_logging:", pval_fathers_HKO50_PAI74p, "\n")
+cat("PAI74 vs PAI74_post_logging:", pval_fathers_PAI74_vs_post, "\n")
 
 
 
@@ -901,3 +1365,115 @@ summary(lm_fathers_distance)
 
 
 
+########################################################################
+### DBH vs reproductive success and dispersal distance #################
+########################################################################
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+# ------------------ Paths ------------------
+path_dfmap <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis/df_map.csv"
+output_dir <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/04-parentage_analysis/04.4-2_plots_analysis"
+
+df_map <- read_csv(path_dfmap, show_col_types = FALSE)
+
+# ------------------ IDs to exclude (logged individuals) ------------------
+excluded_ids <- c(
+  "AM93","AM95","AN06","AN32","AN40","AN41","AN42","AN58","AN63",
+  "AN68","AN74","AN75","AN78","AN84","AN87","AN92","AO01","AO12",
+  "AP04","AP07","AP10","AP13","AP18","AP22","AP23","AP27","AP41",
+  "AP42","AQ08","AQ09","AQ12","AQ14","AQ29","AQ30","AQ34","AQ52",
+  "AQ71","AQ74","AQ75","AS29","AS45","AS61"
+)
+
+# ------------------ Create PAI74_post_logging ------------------
+df_map_post <- df_map %>%
+  mutate(
+    Plot_Mother = if_else(Plot_Mother == "PAI74" & !Mother_ID %in% excluded_ids,
+                          "PAI74_post_logging", Plot_Mother),
+    Plot_Father = if_else(Plot_Father == "PAI74" & !Father_ID %in% excluded_ids,
+                          "PAI74_post_logging", Plot_Father)
+  )
+
+# ------------------ Summaries ------------------
+# Mothers
+mother_summary <- df_map_post %>%
+  filter(!is.na(Mother_ID), !is.na(Plot_Mother), !is.na(DBH_Mother)) %>%
+  group_by(Plot_Mother, Mother_ID, DBH_Mother) %>%
+  summarise(
+    n_offspring = n(),
+    mean_distance = mean(Distance_To_Mother, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Fathers
+father_summary <- df_map_post %>%
+  filter(!is.na(Father_ID), !is.na(Plot_Father), !is.na(DBH_Father)) %>%
+  group_by(Plot_Father, Father_ID, DBH_Father) %>%
+  summarise(
+    n_offspring = n(),
+    mean_distance = mean(Distance_To_Father, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# ------------------ Colors ------------------
+plot_colors <- c("HKO50" = "#CDAD00",
+                 "PAI74" = "mediumorchid4",
+                 "PAI74_post_logging" = "#CD96CD")
+
+# ------------------ Visualisation ------------------
+# 1. Mothers: DBH vs number of offspring
+p1 <- ggplot(mother_summary, aes(x = DBH_Mother, y = n_offspring, color = Plot_Mother)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_color_manual(values = plot_colors) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Mothers: DBH vs reproductive success",
+       x = "DBH (cm)", y = "Number of offspring", color = "Plot")
+
+# 2. Mothers: DBH vs mean seed dispersal distance
+p2 <- ggplot(mother_summary, aes(x = DBH_Mother, y = mean_distance, color = Plot_Mother)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_color_manual(values = plot_colors) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Mothers: DBH vs mean seed dispersal distance",
+       x = "DBH (cm)", y = "Mean seed dispersal distance (m)", color = "Plot")
+
+# 3. Fathers: DBH vs number of offspring
+p3 <- ggplot(father_summary, aes(x = DBH_Father, y = n_offspring, color = Plot_Father)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_color_manual(values = plot_colors) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Fathers: DBH vs reproductive success",
+       x = "DBH (cm)", y = "Number of offspring", color = "Plot")
+
+# 4. Fathers: DBH vs mean pollen dispersal distance
+p4 <- ggplot(father_summary, aes(x = DBH_Father, y = mean_distance, color = Plot_Father)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_color_manual(values = plot_colors) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Fathers: DBH vs mean pollen dispersal distance",
+       x = "DBH (cm)", y = "Mean pollen dispersal distance (m)", color = "Plot")
+
+# ------------------ Save ------------------
+ggsave(file.path(output_dir, "dbh_vs_offspring_mothers_post.png"), p1, width = 8, height = 6, dpi = 300)
+ggsave(file.path(output_dir, "dbh_vs_distance_mothers_post.png"), p2, width = 8, height = 6, dpi = 300)
+ggsave(file.path(output_dir, "dbh_vs_offspring_fathers_post.png"), p3, width = 8, height = 6, dpi = 300)
+ggsave(file.path(output_dir, "dbh_vs_distance_fathers_post.png"), p4, width = 8, height = 6, dpi = 300)
+
+# ------------------ Statistics ------------------
+lm_mothers_offspring <- lm(n_offspring ~ DBH_Mother * Plot_Mother, data = mother_summary)
+lm_mothers_distance  <- lm(mean_distance ~ DBH_Mother * Plot_Mother, data = mother_summary)
+
+lm_fathers_offspring <- lm(n_offspring ~ DBH_Father * Plot_Father, data = father_summary)
+lm_fathers_distance  <- lm(mean_distance ~ DBH_Father * Plot_Father, data = father_summary)
+
+summary(lm_mothers_offspring)
+summary(lm_mothers_distance)
+summary(lm_fathers_offspring)
+summary(lm_fathers_distance)

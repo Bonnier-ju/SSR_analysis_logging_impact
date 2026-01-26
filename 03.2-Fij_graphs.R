@@ -9,10 +9,10 @@ library(dplyr)
 ### Files parameters ###
 site_id <- "PAI74"         
 site_title <- "PAI74"   
-suffix <- "FULL_logged"         
-line_color <- "mediumorchid4"
+suffix <- "SED_inopening"         
+line_color <- "brown2"
 
-base_path <- "C:/Users/bonni/OneDrive/Université/Thèse/Dicorynia/Article - Logging impact/Analysis/03-diversity_and_SGS_analysis/spagedie/input_for_Fij_graphs"
+base_path <- "C:/Users/bonni/OneDrive/University/Thesis/Dicorynia/Article-Logging_impact/Analysis/07-post_analysis_on_dispersal/07.2-canopy_openning_and_seedlings"
 
 
 input_file <- file.path(base_path, paste0("Fij_", site_id, "_", suffix, ".csv"))
@@ -65,7 +65,7 @@ plot <- ggplot() +
   coord_cartesian(ylim = c(-0.09, 0.09)) +
   geom_text(
     aes(x = Inf, y = Inf, label = paste0("b-log = ", b_log)),
-    hjust = 1.5, vjust = 3, size = 4
+    hjust = 1.5, vjust = 3, size = 5
   ) +
   labs(
     title = paste(site_title, suffix, sep = " - "), 
@@ -74,11 +74,11 @@ plot <- ggplot() +
   ) +
   theme_minimal() +
   theme(
-    plot.title   = element_text(size = 15, face = "bold", hjust = 0.5),
-    axis.title.x = element_text(size = 13),
-    axis.title.y = element_text(size = 13),
-    axis.text.x  = element_text(size = 12),
-    axis.text.y  = element_text(size = 12)
+    plot.title   = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 15),
+    axis.title.y = element_text(size = 15),
+    axis.text.x  = element_text(size = 15),
+    axis.text.y  = element_text(size = 15)
   )
 
 print(plot)
